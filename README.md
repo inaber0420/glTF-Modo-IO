@@ -1,3 +1,9 @@
+Referring to glTF-Blender-IO https://github.com/KhronosGroup/glTF-Blender-IO.git
+I'll start by deciphering it.
+
+
+-------
+
 [![Blender](misc/Blender_logo.png)](http://www.blender.org/) [![glTF](misc/glTF_logo.png)](https://www.khronos.org/gltf/)  
 
 Blender glTF 2.0 Importer and Exporter
