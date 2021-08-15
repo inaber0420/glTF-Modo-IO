@@ -1,4 +1,5 @@
 Referring to glTF-Blender-IO https://github.com/KhronosGroup/glTF-Blender-IO.git
+
 I'll start by deciphering it.
 
 
