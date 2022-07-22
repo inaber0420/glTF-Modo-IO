@@ -18,26 +18,49 @@ import numpy as np
 
 from .gltf2_blender_export_keys import NORMALS, MORPH_NORMAL, TANGENTS, MORPH_TANGENT, MORPH
 
-from io_scene_gltf2.blender.exp.gltf2_blender_gather_cache import cached
+from io_scene_gltf2.blender.exp.gltf2_blender_gather_cache import cached, cached_by_key
 from io_scene_gltf2.blender.exp import gltf2_blender_extract
 from io_scene_gltf2.blender.exp import gltf2_blender_gather_accessors
 from io_scene_gltf2.blender.exp import gltf2_blender_gather_primitive_attributes
 from io_scene_gltf2.blender.exp import gltf2_blender_gather_materials
+from io_scene_gltf2.blender.exp import gltf2_blender_gather_materials_variants
 
 from io_scene_gltf2.io.com import gltf2_io
 from io_scene_gltf2.io.exp import gltf2_io_binary_data
 from io_scene_gltf2.io.com import gltf2_io_constants
+from io_scene_gltf2.io.com import gltf2_io_extensions
 from io_scene_gltf2.io.com.gltf2_io_debug import print_console
 
 
 @cached
+def get_primitive_cache_key(
+        blender_mesh,
+        blender_object,
+        vertex_groups,
+        modifiers,
+        materials,
+        export_settings):
+
+    # Use id of mesh
+    # Do not use bpy.types that can be unhashable
+    # Do not use mesh name, that can be not unique (when linked)
+
+    # TODO check what is really needed for modifiers
+
+    return (
+        (id(blender_mesh),),
+        (modifiers,),
+        tuple(id(m) if m is not None else None for m in materials)
+    )
+
+
+@cached_by_key(key=get_primitive_cache_key)
 def gather_primitives(
         blender_mesh: bpy.types.Mesh,
-        library: Optional[str],
-        blender_object: Optional[bpy.types.Object],
+        uuid_for_skined_data,
         vertex_groups: Optional[bpy.types.VertexGroups],
         modifiers: Optional[bpy.types.ObjectModifiers],
-        material_names: Tuple[str],
+        materials: Tuple[bpy.types.Material],
         export_settings
         ) -> List[gltf2_io.MeshPrimitive]:
     """
@@ -47,7 +70,14 @@ def gather_primitives(
     """
     primitives = []
 
-    blender_primitives = __gather_cache_primitives(blender_mesh, library, blender_object,
+    # retrieve active render UVMap
+    active_uvmap_idx = 0
+    for i in range(len(blender_mesh.uv_layers)):
+        if blender_mesh.uv_layers[i].active_render is True:
+            active_uvmap_idx = i
+            break
+
+    blender_primitives = __gather_cache_primitives(blender_mesh, uuid_for_skined_data,
         vertex_groups, modifiers, export_settings)
 
     for internal_primitive in blender_primitives:
@@ -56,20 +86,20 @@ def gather_primitives(
 
         if export_settings['gltf_materials'] == "EXPORT" and material_idx is not None:
             blender_material = None
-            if material_names:
-                i = material_idx if material_idx < len(material_names) else -1
-                material_name = material_names[i]
-                if material_name is not None:
-                    blender_material = bpy.data.materials[material_name]
-            if blender_material is not None:
+            mat = None
+            if materials:
+                i = material_idx if material_idx < len(materials) else -1
+                mat = materials[i]
+            if mat is not None:
                 material = gltf2_blender_gather_materials.gather_material(
-                    blender_material,
-                    export_settings,
+                    mat,
+                    active_uvmap_idx,
+                    export_settings
                 )
 
         primitive = gltf2_io.MeshPrimitive(
             attributes=internal_primitive['attributes'],
-            extensions=None,
+            extensions=__gather_extensions(blender_mesh, material_idx, active_uvmap_idx, export_settings),
             extras=None,
             indices=internal_primitive['indices'],
             material=material,
@@ -83,8 +113,7 @@ def gather_primitives(
 @cached
 def __gather_cache_primitives(
         blender_mesh: bpy.types.Mesh,
-        library: Optional[str],
-        blender_object: Optional[bpy.types.Object],
+        uuid_for_skined_data,
         vertex_groups: Optional[bpy.types.VertexGroups],
         modifiers: Optional[bpy.types.ObjectModifiers],
         export_settings
@@ -95,7 +124,7 @@ def __gather_cache_primitives(
     primitives = []
 
     blender_primitives = gltf2_blender_extract.extract_primitives(
-        None, blender_mesh, library, blender_object, vertex_groups, modifiers, export_settings)
+        blender_mesh, uuid_for_skined_data, vertex_groups, modifiers, export_settings)
 
     for internal_primitive in blender_primitives:
         primitive = {
@@ -198,3 +227,55 @@ def __gather_targets(blender_primitive, blender_mesh, modifiers, export_settings
                     morph_index += 1
         return targets
     return None
+
+def __gather_extensions(blender_mesh,
+                        material_idx: int,
+                        active_uvmap_idx,
+                        export_settings):
+    extensions = {}
+
+    if bpy.context.preferences.addons['io_scene_gltf2'].preferences.KHR_materials_variants_ui is False:
+        return None
+
+    if bpy.data.scenes[0].get('gltf2_KHR_materials_variants_variants') is None:
+        return None
+    if len(bpy.data.scenes[0]['gltf2_KHR_materials_variants_variants']) == 0:
+        return None
+
+    # Material idx is the slot idx. Retrieve associated variant, if any
+    mapping = []
+    for i in [v for v in blender_mesh.gltf2_variant_mesh_data if v.material_slot_index == material_idx]:
+        variants = []
+        for idx, v in enumerate(i.variants):
+            if v.variant.variant_idx in [o.variant.variant_idx for o in i.variants[:idx]]:
+                # Avoid duplicates
+                continue
+            vari = gltf2_blender_gather_materials_variants.gather_variant(v.variant.variant_idx, export_settings)
+            if vari is not None:
+                variant_extension = gltf2_io_extensions.ChildOfRootExtension(
+                name="KHR_materials_variants",
+                path=["variants"],
+                extension=vari
+            )
+            variants.append(variant_extension)
+        if len(variants) > 0:
+            if i.material:
+                mat = gltf2_blender_gather_materials.gather_material(
+                        i.material,
+                        active_uvmap_idx,
+                        export_settings
+                    )
+            else:
+                # empty slot
+                mat = None
+            mapping.append({'material': mat, 'variants': variants})
+
+    if len(mapping) > 0:
+        extensions["KHR_materials_variants"] = gltf2_io_extensions.Extension(
+            name="KHR_materials_variants",
+            extension={
+                "mappings": mapping
+            }
+        )
+
+    return extensions if extensions else None

@@ -18,6 +18,7 @@ from .gltf2_blender_node import BlenderNode
 from .gltf2_blender_animation import BlenderAnimation
 from .gltf2_blender_vnode import VNode, compute_vnodes
 from ..com.gltf2_blender_extras import set_extras
+from io_scene_gltf2.io.imp.gltf2_io_user_extensions import import_user_extensions
 
 
 class BlenderScene():
@@ -36,6 +37,7 @@ class BlenderScene():
             scene.render.engine = "BLENDER_EEVEE"
 
         if gltf.data.scene is not None:
+            import_user_extensions('gather_import_scene_before_hook', gltf, gltf.data.scenes[gltf.data.scene], scene)
             pyscene = gltf.data.scenes[gltf.data.scene]
             set_extras(scene, pyscene.extras)
 
@@ -44,7 +46,19 @@ class BlenderScene():
         gltf.display_current_node = 0  # for debugging
         BlenderNode.create_vnode(gltf, 'root')
 
+        # User extensions before scene creation
+        gltf_scene = None
+        if gltf.data.scene is not None:
+            gltf_scene = gltf.data.scenes[gltf.data.scene]
+        import_user_extensions('gather_import_scene_after_nodes_hook', gltf, gltf_scene, scene)
+
         BlenderScene.create_animations(gltf)
+
+        # User extensions after scene creation
+        gltf_scene = None
+        if gltf.data.scene is not None:
+            gltf_scene = gltf.data.scenes[gltf.data.scene]
+        import_user_extensions('gather_import_scene_after_animation_hook', gltf, gltf_scene, scene)
 
         if bpy.context.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
@@ -54,6 +68,15 @@ class BlenderScene():
     @staticmethod
     def create_animations(gltf):
         """Create animations."""
+
+        # Use a class here, to be able to pass data by reference to hook (to be able to change them inside hook)
+        class IMPORT_animation_options:
+            def __init__(self, restore_first_anim: bool = True):
+                self.restore_first_anim = restore_first_anim
+
+        animation_options = IMPORT_animation_options()
+        import_user_extensions('gather_import_animations', gltf, gltf.data.animations, animation_options)
+
         if gltf.data.animations:
             # NLA tracks are added bottom to top, so create animations in
             # reverse so the first winds up on top
@@ -61,8 +84,9 @@ class BlenderScene():
                 BlenderAnimation.anim(gltf, anim_idx)
 
             # Restore first animation
-            anim_name = gltf.data.animations[0].track_name
-            BlenderAnimation.restore_animation(gltf, anim_name)
+            if animation_options.restore_first_anim:
+                anim_name = gltf.data.animations[0].track_name
+                BlenderAnimation.restore_animation(gltf, anim_name)
 
     @staticmethod
     def select_imported_objects(gltf):

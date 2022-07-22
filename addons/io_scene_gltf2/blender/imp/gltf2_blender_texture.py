@@ -18,6 +18,7 @@ from .gltf2_blender_image import BlenderImage
 from ..com.gltf2_blender_conversion import texture_transform_gltf_to_blender
 from io_scene_gltf2.io.com.gltf2_io import Sampler
 from io_scene_gltf2.io.com.gltf2_io_constants import TextureFilter, TextureWrap
+from io_scene_gltf2.io.imp.gltf2_io_user_extensions import import_user_extensions
 
 def texture(
     mh,
@@ -27,10 +28,14 @@ def texture(
     color_socket,
     alpha_socket=None,
     is_data=False,
+    forced_image=None
 ):
     """Creates nodes for a TextureInfo and hooks up the color/alpha outputs."""
     x, y = location
     pytexture = mh.gltf.data.textures[tex_info.index]
+
+    import_user_extensions('gather_import_texture_before_hook', mh.gltf, pytexture, mh, tex_info, location, label, color_socket, alpha_socket, is_data)
+
     if pytexture.sampler is not None:
         pysampler = mh.gltf.data.samplers[pytexture.sampler]
     else:
@@ -43,12 +48,15 @@ def texture(
     tex_img.location = x - 240, y
     tex_img.label = label
     # Get image
-    if pytexture.source is not None:
-        BlenderImage.create(mh.gltf, pytexture.source)
-        pyimg = mh.gltf.data.images[pytexture.source]
-        blender_image_name = pyimg.blender_image_name
-        if blender_image_name:
-            tex_img.image = bpy.data.images[blender_image_name]
+    if forced_image is None:
+        if pytexture.source is not None:
+            BlenderImage.create(mh.gltf, pytexture.source)
+            pyimg = mh.gltf.data.images[pytexture.source]
+            blender_image_name = pyimg.blender_image_name
+            if blender_image_name:
+                tex_img.image = bpy.data.images[blender_image_name]
+    else:
+        tex_img.image = forced_image
     # Set colorspace for data images
     if is_data:
         if tex_img.image:
@@ -56,7 +64,8 @@ def texture(
     # Set filtering
     set_filtering(tex_img, pysampler)
     # Outputs
-    mh.node_tree.links.new(color_socket, tex_img.outputs['Color'])
+    if color_socket is not None:
+        mh.node_tree.links.new(color_socket, tex_img.outputs['Color'])
     if alpha_socket is not None:
         mh.node_tree.links.new(alpha_socket, tex_img.outputs['Alpha'])
     # Inputs
@@ -165,6 +174,8 @@ def texture(
         uv_map.uv_map = 'UVMap' if uv_idx == 0 else 'UVMap.%03d' % uv_idx
         # Outputs
         mh.node_tree.links.new(uv_socket, uv_map.outputs[0])
+
+    import_user_extensions('gather_import_texture_after_hook', mh.gltf, pytexture, mh.node_tree, mh, tex_info, location, label, color_socket, alpha_socket, is_data)
 
 def set_filtering(tex_img, pysampler):
     """Set the filtering/interpolation on an Image Texture from the glTf sampler."""
