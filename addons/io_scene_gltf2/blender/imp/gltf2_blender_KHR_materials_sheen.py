@@ -14,10 +14,6 @@
 
 from ...io.com.gltf2_io import TextureInfo
 from .gltf2_blender_texture import texture
-from .gltf2_blender_image import BlenderImage
-from ..exp.gltf2_blender_image import TmpImageGuard, make_temp_image_copy
-import numpy as np
-import bpy
 
 def sheen(  mh,
             location_sheenColor,
@@ -42,7 +38,7 @@ def sheen(  mh,
     sheenRoughnessFactor = ext.get('sheenRoughnessFactor', 0.0)
     tex_info_roughness = ext.get('sheenRoughnessTexture')
     if tex_info_roughness is not None:
-        tex_info_roughness = TextureInfo.from_dict(tex_info_roughness)    
+        tex_info_roughness = TextureInfo.from_dict(tex_info_roughness)
 
     if tex_info_color is None:
         sheenColorFactor.extend([1.0])
@@ -51,16 +47,17 @@ def sheen(  mh,
         # Mix sheenColor factor
         sheenColorFactor = sheenColorFactor + [1.0]
         if sheenColorFactor != [1.0, 1.0, 1.0, 1.0]:
-            node = mh.node_tree.nodes.new('ShaderNodeMixRGB')
+            node = mh.node_tree.nodes.new('ShaderNodeMix')
             node.label = 'sheenColor Factor'
+            node.data_type = 'RGBA'
             node.location = x_sheenColor - 140, y_sheenColor
             node.blend_type = 'MULTIPLY'
             # Outputs
-            mh.node_tree.links.new(sheenColor_socket, node.outputs[0])
+            mh.node_tree.links.new(sheenColor_socket, node.outputs[2])
             # Inputs
-            node.inputs['Fac'].default_value = 1.0
-            sheenColor_socket = node.inputs['Color1']
-            node.inputs['Color2'].default_value = sheenColorFactor
+            node.inputs['Factor'].default_value = 1.0
+            sheenColor_socket = node.inputs[6]
+            node.inputs[7].default_value = sheenColorFactor
             x_sheenColor -= 200
 
         texture(

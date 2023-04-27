@@ -14,7 +14,7 @@
 
 import bpy
 from ..com.gltf2_blender_extras import set_extras
-from io_scene_gltf2.io.imp.gltf2_io_user_extensions import import_user_extensions
+from ...io.imp.gltf2_io_user_extensions import import_user_extensions
 
 
 class BlenderCamera():
@@ -39,7 +39,7 @@ class BlenderCamera():
         if pycamera.type == "orthographic":
             cam.type = "ORTHO"
 
-            # TODO: xmag/ymag
+            cam.ortho_scale = max(pycamera.orthographic.xmag, pycamera.orthographic.ymag) * 2
 
             cam.clip_start = pycamera.orthographic.znear
             cam.clip_end = pycamera.orthographic.zfar

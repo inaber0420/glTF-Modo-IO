@@ -15,15 +15,14 @@
 import bpy
 from mathutils import Matrix
 import numpy as np
-
+from ...io.imp.gltf2_io_user_extensions import import_user_extensions
+from ...io.com.gltf2_io_debug import print_console
 from ...io.imp.gltf2_io_binary import BinaryData
+from ...io.com.gltf2_io_constants import DataType, ComponentType
+from ...blender.com.gltf2_blender_conversion import get_attribute_type
 from ..com.gltf2_blender_extras import set_extras
 from .gltf2_blender_material import BlenderMaterial
-from ...io.com.gltf2_io_debug import print_console
 from .gltf2_io_draco_compression_extension import decode_primitive
-from io_scene_gltf2.io.imp.gltf2_io_user_extensions import import_user_extensions
-from ..com.gltf2_blender_ui import gltf2_KHR_materials_variants_primitive, gltf2_KHR_materials_variants_variant, gltf2_KHR_materials_variants_default_material
-
 
 class BlenderMesh():
     """Blender Mesh."""
@@ -86,6 +85,7 @@ def do_primitives(gltf, mesh_idx, skin_idx, mesh, ob):
     num_uvs = 0
     num_cols = 0
     num_joint_sets = 0
+    attributes = set({})
     for prim in pymesh.primitives:
         if 'POSITION' not in prim.attributes:
             continue
@@ -109,11 +109,9 @@ def do_primitives(gltf, mesh_idx, skin_idx, mesh, ob):
         while i < COLOR_MAX and ('COLOR_%d' % i) in prim.attributes: i += 1
         num_cols = max(i, num_cols)
 
-    num_shapekeys = 0
-    if len(pymesh.primitives) > 0: # Empty primitive tab is not allowed, but some invalid files...
-        for morph_i, _ in enumerate(pymesh.primitives[0].targets or []):
-            if pymesh.shapekey_names[morph_i] is not None:
-                num_shapekeys += 1
+        attributes.update(set([k for k in prim.attributes if k.startswith('_')]))
+
+    num_shapekeys = sum(sk_name is not None for sk_name in pymesh.shapekey_names)
 
     # -------------
     # We'll process all the primitives gathering arrays to feed into the
@@ -144,6 +142,13 @@ def do_primitives(gltf, mesh_idx, skin_idx, mesh, ob):
         np.empty(dtype=np.float32, shape=(0,3))  # coordinate for each vert for each shapekey
         for _ in range(num_shapekeys)
     ]
+    attribute_data = []
+    for attr in attributes:
+        attribute_data.append(
+            np.empty(
+                dtype=ComponentType.to_numpy_dtype(gltf.data.accessors[prim.attributes[attr]].component_type),
+                shape=(0, DataType.num_elements(gltf.data.accessors[prim.attributes[attr]].type)))
+                )
 
     for prim in pymesh.primitives:
         prim.num_faces = 0
@@ -201,12 +206,17 @@ def do_primitives(gltf, mesh_idx, skin_idx, mesh, ob):
             vert_joints[i] = np.concatenate((vert_joints[i], js))
             vert_weights[i] = np.concatenate((vert_weights[i], ws))
 
-        for morph_i, target in enumerate(prim.targets or []):
-            if pymesh.shapekey_names[morph_i] is None:
+        sk_i = 0
+        for sk, sk_name in enumerate(pymesh.shapekey_names):
+            if sk_name is None:
                 continue
-            morph_vs = BinaryData.decode_accessor(gltf, target['POSITION'], cache=True)
-            morph_vs = morph_vs[unique_indices]
-            sk_vert_locs[morph_i] = np.concatenate((sk_vert_locs[morph_i], morph_vs))
+            if prim.targets and 'POSITION' in prim.targets[sk]:
+                morph_vs = BinaryData.decode_accessor(gltf, prim.targets[sk]['POSITION'], cache=True)
+                morph_vs = morph_vs[unique_indices]
+            else:
+                morph_vs = np.zeros((len(unique_indices), 3), dtype=np.float32)
+            sk_vert_locs[sk_i] = np.concatenate((sk_vert_locs[sk_i], morph_vs))
+            sk_i += 1
 
         # inv_indices are the indices into the verts just for this prim;
         # calculate indices into the overall verts array
@@ -239,6 +249,16 @@ def do_primitives(gltf, mesh_idx, skin_idx, mesh, ob):
                 else:
                     cols = np.ones((len(indices), 4), dtype=np.float32)
                 loop_cols[col_i] = np.concatenate((loop_cols[col_i], cols))
+
+        for idx, attr in enumerate(attributes):
+            if attr in prim.attributes:
+                attr_data = BinaryData.decode_accessor(gltf, prim.attributes[attr], cache=True)
+            else:
+                attr_data = np.zeros(
+                    (len(indices), DataType.num_elements(gltf.data.accessors[prim.attributes[attr]].type)),
+                     dtype=ComponentType.to_numpy_dtype(gltf.data.accessors[prim.attributes[attr]].component_type)
+                )
+            attribute_data[idx] = np.concatenate((attribute_data[idx], attr_data))
 
     # Accessors are cached in case they are shared between primitives; clear
     # the cache now that all prims are done.
@@ -314,6 +334,10 @@ def do_primitives(gltf, mesh_idx, skin_idx, mesh, ob):
             break
 
         mesh.color_attributes[layer.name].data.foreach_set('color', squish(loop_cols[col_i]))
+
+    # Make sure the first Vertex Color Attribute is the rendered one
+    if num_cols > 0:
+        mesh.color_attributes.render_color_index = 0
 
     # Skinning
     # TODO: this is slow :/
@@ -410,7 +434,7 @@ def do_primitives(gltf, mesh_idx, skin_idx, mesh, ob):
 
                 for mapping in prim.extensions['KHR_materials_variants']['mappings']:
                     # Store, for each variant, the material link to this primitive
-                    
+
                     variant_primitive = mesh.gltf2_variant_mesh_data.add()
                     variant_primitive.material_slot_index = material_index
                     if 'material' not in mapping.keys():
@@ -427,6 +451,23 @@ def do_primitives(gltf, mesh_idx, skin_idx, mesh, ob):
                         vari.variant.variant_idx = variant
 
         mesh.polygons.foreach_set('material_index', material_indices)
+
+    # Custom Attributes
+    for idx, attr in enumerate(attributes):
+
+        blender_attribute_data_type = get_attribute_type(
+            gltf.data.accessors[prim.attributes[attr]].component_type,
+            gltf.data.accessors[prim.attributes[attr]].type
+        )
+
+        blender_attribute = mesh.attributes.new(attr, blender_attribute_data_type, 'POINT')
+        if DataType.num_elements(gltf.data.accessors[prim.attributes[attr]].type) == 1:
+            blender_attribute.data.foreach_set('value', attribute_data[idx].flatten())
+        elif DataType.num_elements(gltf.data.accessors[prim.attributes[attr]].type) > 1:
+            if blender_attribute_data_type in ["BYTE_COLOR", "FLOAT_COLOR"]:
+                blender_attribute.data.foreach_set('color', attribute_data[idx].flatten())
+            else:
+                blender_attribute.data.foreach_set('vector', attribute_data[idx].flatten())
 
     # ----
     # Normals
@@ -566,7 +607,22 @@ def skin_into_bind_pose(gltf, skin_idx, vert_joints, vert_weights, locs, vert_no
         for i in range(4):
             skinning_mats += ws[:, i].reshape(len(ws), 1, 1) * joint_mats[js[:, i]]
             weight_sums += ws[:, i]
-    # Normalize weights to one; necessary for old files / quantized weights
+
+    # Some invalid files have 0 weight sum.
+    # To avoid to have this vertices at 0.0 / 0.0 / 0.0
+    # We set all weight ( aka 1.0 ) to the first bone
+    zeros_indices = np.where(weight_sums == 0)[0]
+    if zeros_indices.shape[0] > 0:
+        print_console('ERROR', 'File is invalid: Some vertices are not assigned to bone(s) ')
+        vert_weights[0][:, 0][zeros_indices] = 1.0 # Assign to first bone with all weight
+
+        # Reprocess IBM for these vertices
+        skinning_mats[zeros_indices] = np.zeros((4, 4), dtype=np.float32)
+        for js, ws in zip(vert_joints, vert_weights):
+            for i in range(4):
+                skinning_mats[zeros_indices] += ws[:, i][zeros_indices].reshape(len(ws[zeros_indices]), 1, 1) * joint_mats[js[:, i][zeros_indices]]
+                weight_sums[zeros_indices] += ws[:, i][zeros_indices]
+
     skinning_mats /= weight_sums.reshape(num_verts, 1, 1)
 
     skinning_mats_3x3 = skinning_mats[:, :3, :3]
@@ -615,7 +671,7 @@ def set_poly_smoothing(gltf, pymesh, mesh, vert_normals, loop_vidxs):
     # Try to guess which polys should be flat based on the fact that all the
     # loop normals for a flat poly are = the poly's normal.
 
-    poly_smooths = np.empty(num_polys, dtype=np.bool)
+    poly_smooths = np.empty(num_polys, dtype=bool)
 
     poly_normals = np.empty(num_polys * 3, dtype=np.float32)
     mesh.polygons.foreach_get('normal', poly_normals)

@@ -14,9 +14,9 @@
 
 from re import M
 import bpy
+from ...io.com.gltf2_io_constants import GLTF_IOR
 from ...io.com.gltf2_io import TextureInfo, MaterialPBRMetallicRoughness
 from ..com.gltf2_blender_material_helpers import get_gltf_node_name, create_settings_group
-from ..com.gltf2_blender_material_helpers import get_gltf_pbr_non_converted_name, create_gltf_pbr_non_converted_group
 from .gltf2_blender_texture import texture
 from .gltf2_blender_KHR_materials_clearcoat import \
     clearcoat, clearcoat_roughness, clearcoat_normal
@@ -25,7 +25,6 @@ from .gltf2_blender_KHR_materials_ior import ior
 from .gltf2_blender_KHR_materials_volume import volume
 from .gltf2_blender_KHR_materials_specular import specular
 from .gltf2_blender_KHR_materials_sheen import sheen
-from ...io.com.gltf2_io_constants import GLTF_IOR
 
 class MaterialHelper:
     """Helper class. Stores material stuff to be passed around everywhere."""
@@ -39,7 +38,6 @@ class MaterialHelper:
             pymat.pbr_metallic_roughness = \
                 MaterialPBRMetallicRoughness.from_dict({})
         self.settings_node = None
-        self.original_pbr_node = None
 
     def is_opaque(self):
         alpha_mode = self.pymat.alpha_mode
@@ -59,10 +57,10 @@ def pbr_metallic_roughness(mh: MaterialHelper):
     additional_location = 40, -370 # For occlusion and/or volume / original PBR extensions
 
     # Set IOR to 1.5, this is the default in glTF
-    # This value may be overidden later if IOR extension is set on file
+    # This value may be overridden later if IOR extension is set on file
     pbr_node.inputs['IOR'].default_value = GLTF_IOR
 
-    if mh.pymat.occlusion_texture is not None:
+    if mh.pymat.occlusion_texture is not None or (mh.pymat.extensions and 'KHR_materials_specular' in mh.pymat.extensions):
         if mh.settings_node is None:
             mh.settings_node = make_settings_node(mh)
             mh.settings_node.location = additional_location
@@ -76,12 +74,13 @@ def pbr_metallic_roughness(mh: MaterialHelper):
 
             need_volume_node = True
 
-            # We also need glTF Settings Node, to set thicknessFactor and thicknessTexture
-            mh.settings_node = make_settings_node(mh)
-            mh.settings_node.location = additional_location
-            mh.settings_node.width = 180
-            volume_location = additional_location
-            additional_location = additional_location[0], additional_location[1] - 150
+            # We also need glTF Material Output Node, to set thicknessFactor and thicknessTexture
+            if mh.settings_node is None:
+                mh.settings_node = make_settings_node(mh)
+                mh.settings_node.location = additional_location
+                mh.settings_node.width = 180
+                volume_location = additional_location
+                additional_location = additional_location[0], additional_location[1] - 150
 
     need_velvet_node = False
     if mh.pymat.extensions and 'KHR_materials_sheen' in mh.pymat.extensions:
@@ -98,15 +97,9 @@ def pbr_metallic_roughness(mh: MaterialHelper):
         make_velvet_socket=need_velvet_node
     )
 
-    if mh.pymat.extensions and 'KHR_materials_specular' in mh.pymat.extensions:
-        # We need glTF PBR Non Converted Extensions Node
-        mh.original_pbr_node = make_pbr_non_converted_extensions_node(mh)
-        mh.original_pbr_node.location = additional_location
-        mh.original_pbr_node.width = 180
-        additional_location = additional_location[0], additional_location[1] - 150
 
     if mh.pymat.extensions and 'KHR_materials_sheen':
-        pass #TOTOEXT     
+        pass #TOTOEXT
 
     locs = calc_locations(mh)
 
@@ -182,8 +175,8 @@ def pbr_metallic_roughness(mh: MaterialHelper):
         location_specular_tint=locs['specularColorTexture'],
         specular_socket=pbr_node.inputs['Specular'],
         specular_tint_socket=pbr_node.inputs['Specular Tint'],
-        original_specular_socket=mh.original_pbr_node.inputs[0] if mh.original_pbr_node else None,
-        original_specularcolor_socket=mh.original_pbr_node.inputs[1] if mh.original_pbr_node else None,
+        original_specular_socket=mh.settings_node.inputs[2] if mh.settings_node else None,
+        original_specularcolor_socket=mh.settings_node.inputs[3] if mh.settings_node else None,
         location_original_specular=locs['original_specularTexture'],
         location_original_specularcolor=locs['original_specularColorTexture']
     )
@@ -335,16 +328,17 @@ def emission(mh: MaterialHelper, location, color_socket, strength_socket):
     # Otherwise, use a multiply node for it
     else:
         if emissive_factor != [1, 1, 1]:
-            node = mh.node_tree.nodes.new('ShaderNodeMixRGB')
+            node = mh.node_tree.nodes.new('ShaderNodeMix')
             node.label = 'Emissive Factor'
+            node.data_type = 'RGBA'
             node.location = x - 140, y
             node.blend_type = 'MULTIPLY'
             # Outputs
-            mh.node_tree.links.new(color_socket, node.outputs[0])
+            mh.node_tree.links.new(color_socket, node.outputs[2])
             # Inputs
-            node.inputs['Fac'].default_value = 1.0
-            color_socket = node.inputs['Color1']
-            node.inputs['Color2'].default_value = emissive_factor + [1]
+            node.inputs['Factor'].default_value = 1.0
+            color_socket = node.inputs[6]
+            node.inputs[7].default_value = emissive_factor + [1]
 
             x -= 200
 
@@ -400,16 +394,17 @@ def base_color(
     needs_alpha_factor = base_color_factor[3] != 1.0 and alpha_socket is not None
     if needs_color_factor or needs_alpha_factor:
         if needs_color_factor:
-            node = mh.node_tree.nodes.new('ShaderNodeMixRGB')
+            node = mh.node_tree.nodes.new('ShaderNodeMix')
             node.label = 'Color Factor'
+            node.data_type = "RGBA"
             node.location = x - 140, y
             node.blend_type = 'MULTIPLY'
             # Outputs
-            mh.node_tree.links.new(color_socket, node.outputs[0])
+            mh.node_tree.links.new(color_socket, node.outputs[2])
             # Inputs
-            node.inputs['Fac'].default_value = 1.0
-            color_socket = node.inputs['Color1']
-            node.inputs['Color2'].default_value = base_color_factor[:3] + [1]
+            node.inputs['Factor'].default_value = 1.0
+            color_socket = node.inputs[6]
+            node.inputs[7].default_value = base_color_factor[:3] + [1]
 
         if needs_alpha_factor:
             node = mh.node_tree.nodes.new('ShaderNodeMath')
@@ -432,16 +427,17 @@ def base_color(
 
     # Mix texture and vertex color together
     if base_color_texture is not None and mh.vertex_color:
-        node = mh.node_tree.nodes.new('ShaderNodeMixRGB')
+        node = mh.node_tree.nodes.new('ShaderNodeMix')
         node.label = 'Mix Vertex Color'
+        node.data_type = 'RGBA'
         node.location = x - 140, y
         node.blend_type = 'MULTIPLY'
         # Outputs
-        mh.node_tree.links.new(color_socket, node.outputs[0])
+        mh.node_tree.links.new(color_socket, node.outputs[2])
         # Inputs
-        node.inputs['Fac'].default_value = 1.0
-        texture_color_socket = node.inputs['Color1']
-        vcolor_color_socket = node.inputs['Color2']
+        node.inputs['Factor'].default_value = 1.0
+        texture_color_socket = node.inputs[6]
+        vcolor_color_socket = node.inputs[7]
 
         if alpha_socket is not None:
             node = mh.node_tree.nodes.new('ShaderNodeMath')
@@ -459,7 +455,7 @@ def base_color(
     # Vertex Color
     if mh.vertex_color:
         node = mh.node_tree.nodes.new('ShaderNodeVertexColor')
-        node.layer_name = 'Col'
+        # Do not set the layer name, so rendered one will be used (At import => The first one)
         node.location = x - 250, y - 240
         # Outputs
         mh.node_tree.links.new(vcolor_color_socket, node.outputs['Color'])
@@ -594,16 +590,17 @@ def occlusion(mh: MaterialHelper, location, occlusion_socket):
     if strength is None: strength = 1.0
     if strength != 1.0:
         # Mix with white
-        node = mh.node_tree.nodes.new('ShaderNodeMixRGB')
+        node = mh.node_tree.nodes.new('ShaderNodeMix')
         node.label = 'Occlusion Strength'
+        node.data_type = 'RGBA'
         node.location = x - 140, y
         node.blend_type = 'MIX'
         # Outputs
         mh.node_tree.links.new(occlusion_socket, node.outputs[0])
         # Inputs
-        node.inputs['Fac'].default_value = strength
-        node.inputs['Color1'].default_value = [1, 1, 1, 1]
-        occlusion_socket = node.inputs['Color2']
+        node.inputs['Factor'].default_value = strength
+        node.inputs[6].default_value = [1, 1, 1, 1]
+        occlusion_socket = node.inputs[7]
 
         x -= 200
 
@@ -629,7 +626,7 @@ def occlusion(mh: MaterialHelper, location, occlusion_socket):
 
 # => [Add Emission] => [Mix Alpha] => [Material Output] if needed, only for SpecGlossiness
 # => [Volume] => [Add Shader] => [Material Output] if needed
-# => [Velvet] => [Add Shader] => [Material Output] if nedded
+# => [Velvet] => [Add Shader] => [Material Output] if needed
 def make_output_nodes(
     mh: MaterialHelper,
     location,
@@ -762,22 +759,4 @@ def get_settings_group():
     else:
         # Create a new node group
         gltf_node_group = create_settings_group(gltf_node_group_name)
-    return gltf_node_group
-
-def make_pbr_non_converted_extensions_node(mh):
-    """
-    Make a Group node with a hookup for PBR Non Converted Extensions. No effect in Blender, but
-    used to tell the exporter what the original map(s) should be.
-    """
-    node = mh.node_tree.nodes.new('ShaderNodeGroup')
-    node.node_tree = get_pbr_non_converted_extensions_group()
-    return node
-
-def get_pbr_non_converted_extensions_group():
-    gltf_node_group_name = get_gltf_pbr_non_converted_name()
-    if gltf_node_group_name in bpy.data.node_groups:
-        gltf_node_group = bpy.data.node_groups[gltf_node_group_name]
-    else:
-        # Create a new node group
-        gltf_node_group = create_gltf_pbr_non_converted_group(gltf_node_group_name)
     return gltf_node_group

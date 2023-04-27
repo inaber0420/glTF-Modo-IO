@@ -15,8 +15,8 @@ bl_info = {
 }
 
 # glTF extensions are named following a convention with known prefixes.
-# See: https://github.com/KhronosGroup/glTF/tree/master/extensions#about-gltf-extensions
-# also: https://github.com/KhronosGroup/glTF/blob/master/extensions/Prefixes.md
+# See: https://github.com/KhronosGroup/glTF/tree/main/extensions#about-gltf-extensions
+# also: https://github.com/KhronosGroup/glTF/blob/main/extensions/Prefixes.md
 glTF_extension_name = "EXT_example_extension"
 
 class ExampleImporterExtensionProperties(bpy.types.PropertyGroup):
@@ -70,11 +70,11 @@ class glTF2ImportUserExtension:
         self.properties = bpy.context.scene.ExampleImporterExtensionProperties
         self.extensions = [Extension(name="TEST_extension1", extension={}, required=True), Extension(name="TEST_extension2", extension={}, required=False)]
 
-    def gather_import_node_before_hook(self, vnode, gltf_node, import_settings):
+    def gather_import_node_before_hook(self, vnode, gltf_node, gltf):
         if self.properties.enabled:
             pass
 
-    def gather_import_node_after_hook(self, vnode, gltf_node, blender_object, import_settings):
+    def gather_import_node_after_hook(self, vnode, gltf_node, blender_object, gltf):
         if self.properties.enabled:
             pass
 
