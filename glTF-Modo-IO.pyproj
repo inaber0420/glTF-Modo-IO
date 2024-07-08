@@ -1,0 +1,239 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{565cacc6-ad95-449f-a09c-bebc534d7c65}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile />
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>Global|PythonCore|3.9</InterpreterId>
+    <IsWindowsApplication>False</IsWindowsApplication>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="AUTHORS.txt" />
+    <Content Include="docs\io_process.png" />
+    <Content Include="docs\packages.png" />
+    <Content Include="images\addons_import-export_scene-gltf2-animation-star-track.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-alpha-blend.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-backface-culling.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-base-color-image-hookup.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-base-color-solid-green.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-channels.jpg" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-clearcoat.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-emissive.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-mapping.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-metal-rough.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-normal.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-occlusion-only.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-orm-hookup.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-principled.png" />
+    <Content Include="images\addons_import-export_scene-gltf2_material-unlit.png" />
+    <Content Include="LICENSE.txt" />
+    <Content Include="misc\Blender_logo.png" />
+    <Content Include="misc\glTF_logo.png" />
+    <Content Include="tests\roundtrip\01_alpha_blend\01_alpha_blend.png" />
+    <Content Include="tests\roundtrip\01_alpha_mask\01_alpha_mask.png" />
+    <Content Include="tests\roundtrip\01_morphed_cube\01_morphed_cube_options.txt" />
+    <Content Include="tests\roundtrip\01_principled_material\01_principled_baseColor.png" />
+    <Content Include="tests\roundtrip\01_principled_material\01_principled_emissive.png" />
+    <Content Include="tests\roundtrip\01_principled_material\01_principled_normal.png" />
+    <Content Include="tests\roundtrip\01_principled_material\01_principled_occlusionRoughnessMetallic.png" />
+    <Content Include="tests\roundtrip\01_textured_sphere\01_Textured_Sphere_BaseColor.png" />
+    <Content Include="tests\roundtrip\01_textured_sphere\01_Textured_Sphere_Normal.png" />
+    <Content Include="tests\roundtrip\01_textured_sphere\01_Textured_Sphere_OcclusionRoughnessMetallic.png" />
+    <Content Include="tests\roundtrip\01_textured_sphere_principled_bsdf\01_Textured_Sphere_BaseColor.png" />
+    <Content Include="tests\roundtrip\01_textured_sphere_principled_bsdf\01_Textured_Sphere_Normal.png" />
+    <Content Include="tests\roundtrip\01_textured_sphere_principled_bsdf\01_Textured_Sphere_OcclusionRoughnessMetallic.png" />
+    <Content Include="tests\roundtrip\02_suzanne\02_Suzanne_BaseColor.png" />
+    <Content Include="tests\roundtrip\02_suzanne\02_suzanne_Normal.png" />
+    <Content Include="tests\roundtrip\02_suzanne\02_Suzanne_OcclusionRoughnessMetallic.png" />
+    <Content Include="tests\roundtrip\04_common_materials\04_crate.png" />
+    <Content Include="tests\roundtrip\04_lenna\04_crate.png" />
+    <Content Include="tests\roundtrip\08_combine_orm\08_tiny-box-rgb.png" />
+    <Content Include="tests\roundtrip\09_texture_transform\09_tiny_grid.png" />
+    <Content Include="tests\roundtrip\11_factors_and_textures\Blank.png" />
+    <Content Include="tests\roundtrip\12_orm_two_uvmaps\ORM.png" />
+    <Content Include="tests\roundtrip\13_occlusion_strength\White.png" />
+    <Content Include="tests\roundtrip\13_texture_wrapping\Black.png" />
+    <Content Include="tests\scenes\01_alpha_blend.png" />
+    <Content Include="tests\scenes\01_alpha_mask.png" />
+    <Content Include="tests\scenes\01_principled_baseColor.png" />
+    <Content Include="tests\scenes\01_principled_emissive.png" />
+    <Content Include="tests\scenes\01_principled_normal.png" />
+    <Content Include="tests\scenes\01_principled_occlusionRoughnessMetallic.png" />
+    <Content Include="tests\scenes\01_Textured_Sphere_BaseColor.png" />
+    <Content Include="tests\scenes\01_Textured_Sphere_Normal.png" />
+    <Content Include="tests\scenes\01_Textured_Sphere_OcclusionRoughnessMetallic.png" />
+    <Content Include="tests\scenes\02_Suzanne_BaseColor.png" />
+    <Content Include="tests\scenes\02_suzanne_Normal.png" />
+    <Content Include="tests\scenes\02_Suzanne_OcclusionRoughnessMetallic.png" />
+    <Content Include="tests\scenes\04_crate.png" />
+    <Content Include="tests\scenes\08_img_metal.png" />
+    <Content Include="tests\scenes\08_img_occlusion.png" />
+    <Content Include="tests\scenes\08_img_rough.png" />
+    <Content Include="tests\scenes\08_normal_ribs.png" />
+    <Content Include="tests\scenes\08_tiny-box-rgb.png" />
+    <Content Include="tests\scenes\08_tiny-box-rg_.png" />
+    <Content Include="tests\scenes\08_tiny-box-r_b.png" />
+    <Content Include="tests\scenes\08_tiny-box-_gb.png" />
+    <Content Include="tests\scenes\08_tiny-box-_g_.png" />
+    <Content Include="tests\scenes\08_tiny-box-__b.png" />
+    <Content Include="tests\scenes\09_tiny_grid.png" />
+    <Content Include="tests\scenes\Lenna.png" />
+    <Content Include="tests\test\test.js" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="addons\io_scene_gltf2\blender\com\gltf2_blender_conversion.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\com\gltf2_blender_data_path.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\com\gltf2_blender_extras.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\com\gltf2_blender_json.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\com\gltf2_blender_material_helpers.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\com\gltf2_blender_math.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_export.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_export_keys.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_extract.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_accessors.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_animations.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_animation_channels.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_animation_channel_target.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_animation_samplers.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_animation_sampler_keyframes.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_cache.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_cameras.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_drivers.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_image.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_joints.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_lights.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_light_spots.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_materials.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_materials_pbr_metallic_roughness.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_materials_unlit.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_mesh.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_nodes.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_primitives.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_primitive_attributes.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_sampler.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_skins.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_texture.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gather_texture_info.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_get.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_gltf2_exporter.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_image.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\exp\gltf2_blender_search_node_tree.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_animation.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_animation_node.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_animation_utils.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_animation_weight.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_camera.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_gltf.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_image.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_KHR_materials_clearcoat.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_KHR_materials_pbrSpecularGlossiness.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_KHR_materials_unlit.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_light.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_material.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_mesh.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_node.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_pbrMetallicRoughness.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_scene.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_texture.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_blender_vnode.py" />
+    <Compile Include="addons\io_scene_gltf2\blender\imp\gltf2_io_draco_compression_extension.py" />
+    <Compile Include="addons\io_scene_gltf2\io\com\gltf2_io.py" />
+    <Compile Include="addons\io_scene_gltf2\io\com\gltf2_io_constants.py" />
+    <Compile Include="addons\io_scene_gltf2\io\com\gltf2_io_debug.py" />
+    <Compile Include="addons\io_scene_gltf2\io\com\gltf2_io_draco_compression_extension.py" />
+    <Compile Include="addons\io_scene_gltf2\io\com\gltf2_io_extensions.py" />
+    <Compile Include="addons\io_scene_gltf2\io\com\gltf2_io_lights_punctual.py" />
+    <Compile Include="addons\io_scene_gltf2\io\exp\gltf2_io_binary_data.py" />
+    <Compile Include="addons\io_scene_gltf2\io\exp\gltf2_io_buffer.py" />
+    <Compile Include="addons\io_scene_gltf2\io\exp\gltf2_io_draco_compression_extension.py" />
+    <Compile Include="addons\io_scene_gltf2\io\exp\gltf2_io_export.py" />
+    <Compile Include="addons\io_scene_gltf2\io\exp\gltf2_io_image_data.py" />
+    <Compile Include="addons\io_scene_gltf2\io\exp\gltf2_io_user_extensions.py" />
+    <Compile Include="addons\io_scene_gltf2\io\imp\gltf2_io_binary.py" />
+    <Compile Include="addons\io_scene_gltf2\io\imp\gltf2_io_gltf.py" />
+    <Compile Include="addons\io_scene_gltf2\io\imp\__init__.py" />
+    <Compile Include="addons\io_scene_gltf2\io\__init__.py" />
+    <Compile Include="addons\io_scene_gltf2\__init__.py" />
+    <Compile Include="example-addons\example_gltf_extension\__init__.py" />
+    <Compile Include="MyLxModules\lxifc.py" />
+    <Compile Include="MyLxModules\lxu\attrdesc.py" />
+    <Compile Include="MyLxModules\lxu\attributes.py" />
+    <Compile Include="MyLxModules\lxu\chanmod.py" />
+    <Compile Include="MyLxModules\lxu\command.py" />
+    <Compile Include="MyLxModules\lxu\meta.py" />
+    <Compile Include="MyLxModules\lxu\object.py" />
+    <Compile Include="MyLxModules\lxu\package.py" />
+    <Compile Include="MyLxModules\lxu\select.py" />
+    <Compile Include="MyLxModules\lxu\service.py" />
+    <Compile Include="MyLxModules\lxu\utils.py" />
+    <Compile Include="MyLxModules\lxu\vector.py" />
+    <Compile Include="MyLxModules\lxu\__init__.py" />
+    <Compile Include="MyLxModules\lx\ifc.py" />
+    <Compile Include="MyLxModules\lx\object.py" />
+    <Compile Include="MyLxModules\lx\result.py" />
+    <Compile Include="MyLxModules\lx\service.py" />
+    <Compile Include="MyLxModules\lx\symbol.py" />
+    <Compile Include="MyLxModules\lx\__init__.py" />
+    <Compile Include="tests\export_gltf.py" />
+    <Compile Include="tests\roundtrip_gltf.py" />
+    <Compile Include="tools\copy_doc.py" />
+    <Compile Include="tools\copy_repo.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="addons\" />
+    <Folder Include="addons\io_scene_gltf2" />
+    <Folder Include="addons\io_scene_gltf2\blender\" />
+    <Folder Include="addons\io_scene_gltf2\blender\com" />
+    <Folder Include="addons\io_scene_gltf2\blender\exp" />
+    <Folder Include="addons\io_scene_gltf2\blender\imp" />
+    <Folder Include="addons\io_scene_gltf2\io" />
+    <Folder Include="addons\io_scene_gltf2\io\com" />
+    <Folder Include="addons\io_scene_gltf2\io\exp" />
+    <Folder Include="addons\io_scene_gltf2\io\imp" />
+    <Folder Include="docs" />
+    <Folder Include="example-addons\" />
+    <Folder Include="example-addons\example_gltf_extension" />
+    <Folder Include="images" />
+    <Folder Include="misc" />
+    <Folder Include="MyLxModules\" />
+    <Folder Include="MyLxModules\lxu\" />
+    <Folder Include="MyLxModules\lx\" />
+    <Folder Include="tests" />
+    <Folder Include="tests\roundtrip\" />
+    <Folder Include="tests\roundtrip\01_alpha_blend" />
+    <Folder Include="tests\roundtrip\01_alpha_mask" />
+    <Folder Include="tests\roundtrip\01_morphed_cube" />
+    <Folder Include="tests\roundtrip\01_principled_material" />
+    <Folder Include="tests\roundtrip\01_textured_sphere" />
+    <Folder Include="tests\roundtrip\01_textured_sphere_principled_bsdf" />
+    <Folder Include="tests\roundtrip\02_suzanne" />
+    <Folder Include="tests\roundtrip\04_common_materials" />
+    <Folder Include="tests\roundtrip\04_lenna" />
+    <Folder Include="tests\roundtrip\08_combine_orm" />
+    <Folder Include="tests\roundtrip\09_texture_transform" />
+    <Folder Include="tests\roundtrip\11_factors_and_textures" />
+    <Folder Include="tests\roundtrip\12_orm_two_uvmaps" />
+    <Folder Include="tests\roundtrip\13_occlusion_strength" />
+    <Folder Include="tests\roundtrip\13_texture_wrapping" />
+    <Folder Include="tests\scenes" />
+    <Folder Include="tests\test" />
+    <Folder Include="tools" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="Global|PythonCore|3.9" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>
