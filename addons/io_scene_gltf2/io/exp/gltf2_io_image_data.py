@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import re
 
 
@@ -31,9 +32,9 @@ class ImageData:
         return hash(self._data)
 
     def adjusted_name(self):
-        regex_dot = re.compile("\.")
+        regex_dot = re.compile(r"\.")
         adjusted_name = re.sub(regex_dot, "_", self.name)
-        new_name = "".join([char for char in adjusted_name if char not in "!#$&'()*+,/:;<>?@[\]^`{|}~"])
+        new_name = "".join([char for char in adjusted_name if char not in r"!#$&'()*+,/:;<>?@[\]^`{|}~"])
         return new_name
 
     @property
@@ -48,6 +49,8 @@ class ImageData:
     def file_extension(self):
         if self._mime_type == "image/jpeg":
             return ".jpg"
+        elif self._mime_type == "image/webp":
+            return ".webp"
         return ".png"
 
     @property

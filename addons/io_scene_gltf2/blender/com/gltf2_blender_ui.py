@@ -32,10 +32,13 @@ class NODE_OT_GLTF_SETTINGS(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         space = context.space_data
-        return space.type == "NODE_EDITOR" \
-            and context.object and context.object.active_material \
-            and context.object.active_material.use_nodes is True \
+        return (
+            space is not None
+            and space.type == "NODE_EDITOR"
+            and context.object and context.object.active_material
+            and context.object.active_material.use_nodes is True
             and bpy.context.preferences.addons['io_scene_gltf2'].preferences.settings_node_ui is True
+        )
 
     def execute(self, context):
         gltf_settings_node_name = get_gltf_node_name()
@@ -447,7 +450,6 @@ class SCENE_OT_gltf2_remove_material_variant(bpy.types.Operator):
 
 ################ glTF Animation ###########################################
 
-
 class gltf2_animation_NLATrackNames(bpy.types.PropertyGroup):
     name : bpy.props.StringProperty(name="NLA Track Name")
 
@@ -494,11 +496,27 @@ class SCENE_OT_gltf2_animation_apply(bpy.types.Operator):
             if obj.type == "MESH" and obj.data and obj.data.shape_keys and obj.data.shape_keys.animation_data:
                 obj.data.shape_keys.animation_data.action = None
                 for idx, data in enumerate(obj.gltf2_animation_weight_rest):
-                    obj.data.shape_keys.key_blocks[idx+1].value = data.val 
+                    obj.data.shape_keys.key_blocks[idx+1].value = data.val
 
                 for track in [track for track in obj.data.shape_keys.animation_data.nla_tracks \
                         if track.name == track_name and len(track.strips) > 0 and track.strips[0].action is not None]:
                     obj.data.shape_keys.animation_data.action = track.strips[0].action
+
+            if obj.type in ["LIGHT", "CAMERA"] and obj.data and obj.data.animation_data:
+                obj.data.animation_data.action = None
+                for track in [track for track in obj.data.animation_data.nla_tracks \
+                        if track.name == track_name and len(track.strips) > 0 and track.strips[0].action is not None]:
+                    obj.data.animation_data.action = track.strips[0].action
+
+
+        for mat in bpy.data.materials:
+            if not mat.node_tree:
+                continue
+            if mat.node_tree.animation_data:
+                mat.node_tree.animation_data.action = None
+                for track in [track for track in mat.node_tree.animation_data.nla_tracks \
+                        if track.name == track_name and len(track.strips) > 0 and track.strips[0].action is not None]:
+                    mat.node_tree.animation_data.action = track.strips[0].action
 
         bpy.data.scenes[0].gltf2_animation_applied = self.index
         return {'FINISHED'}
@@ -525,11 +543,69 @@ class SCENE_PT_gltf2_animation(bpy.types.Panel):
 class GLTF2_weight(bpy.types.PropertyGroup):
     val : bpy.props.FloatProperty(name="weight")
 
+################################### Filtering animation ####################
+
+class SCENE_OT_gltf2_action_filter_refresh(bpy.types.Operator):
+    """Refresh list of actions"""
+    bl_idname = "scene.gltf2_action_filter_refresh"
+    bl_label = "Refresh action list"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(self, context):
+        return True
+
+    def execute(self, context):
+        for action in bpy.data.actions:
+            if id(action) in [id(i.action) for i in bpy.data.scenes[0].gltf_action_filter]:
+                continue
+            item = bpy.data.scenes[0].gltf_action_filter.add()
+            item.action = action
+            item.keep = True
+
+        return {'FINISHED'}
+
+class SCENE_UL_gltf2_filter_action(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+
+        action = item.action
+        layout.context_pointer_set("id", action)
+
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            layout.prop(item.action, "name", text="", emboss=False)
+            layout.prop(item, "keep", text="", emboss=True)
+
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+
+def export_panel_animation_action_filter(layout, operator):
+    if operator.export_animation_mode not in ["ACTIONS", "ACTIVE_ACTIONS", "BROADCAST"]:
+        return
+
+    header, body = layout.panel("GLTF_export_action_filter", default_closed=True)
+    header.use_property_split = False
+    header.prop(operator, "export_action_filter", text="")
+    header.label(text="Action Filter")
+    if body and operator.export_action_filter:
+        body.active = operator.export_animations and operator.export_action_filter
+
+        row = body.row()
+
+        if len(bpy.data.actions) > 0:
+            row.template_list("SCENE_UL_gltf2_filter_action", "", bpy.data.scenes[0], "gltf_action_filter", bpy.data.scenes[0], "gltf_action_filter_active")
+            col = row.column()
+            row = col.column(align=True)
+            row.operator("scene.gltf2_action_filter_refresh", icon="FILE_REFRESH", text="")
+        else:
+            row.label(text="No Actions in .blend file")
+
 ###############################################################################
 
 def register():
     bpy.utils.register_class(NODE_OT_GLTF_SETTINGS)
-    bpy.types.NODE_MT_category_SH_NEW_OUTPUT.append(add_gltf_settings_to_menu)
+    bpy.types.NODE_MT_category_shader_output.append(add_gltf_settings_to_menu)
+    bpy.utils.register_class(SCENE_OT_gltf2_action_filter_refresh)
+    bpy.utils.register_class(SCENE_UL_gltf2_filter_action)
 
 def variant_register():
     bpy.utils.register_class(SCENE_OT_gltf2_display_variant)
@@ -557,6 +633,8 @@ def variant_register():
 
 def unregister():
     bpy.utils.unregister_class(NODE_OT_GLTF_SETTINGS)
+    bpy.utils.unregister_class(SCENE_UL_gltf2_filter_action)
+    bpy.utils.unregister_class(SCENE_OT_gltf2_action_filter_refresh)
 
 def variant_unregister():
     bpy.utils.unregister_class(SCENE_OT_gltf2_variant_add)

@@ -42,6 +42,19 @@ compared to Blender, as such vertices are separated for export.
 Likewise, curves and other non-mesh data are not preserved,
 and must be converted to meshes prior to export.
 
+GPU Instances
+-------------
+
+When the option is enable in Exporter, instances are exported using the ``EXT_mesh_gpu_instancing`` extension.
+There are some limitations, at export:
+
+- Instances must be meshes, and don't have any children themselves
+- Instances must all be children of the same object.
+- This extension doesn't manage material variation. That means that the generated file may include all instances with
+  same materials.
+- Instances detected are objects sharing the same mesh data.
+
+At import, instances are created by creating objects sharing the same mesh data.
 
 Materials
 =========
@@ -57,7 +70,7 @@ with the following channels of information:
 - Emissive
 
 Some additional material properties or types of materials can be expressed using glTF extensions.
-The complete list can be found in _Extensions_ part of this documentation.
+The complete list can be found in `Extensions`_ part of this documentation.
 
 .. figure:: /images/addons_import-export_scene-gltf2_material-channels.jpg
 
@@ -73,7 +86,7 @@ The glTF material system is different from Blender's own materials. When a glTF 
 the add-on will construct a set of Blender nodes to replicate each glTF material as closely as possible.
 
 The importer supports Metal/Rough PBR (core glTF), Spec/Gloss PBR (``KHR_materials_pbrSpecularGlossiness``)
-and some extension materials. The complete list can be found in _Extensions_ part of this documentation.
+and some extension materials. The complete list can be found in `Extensions`_ part of this documentation.
 
 .. tip::
 
@@ -159,10 +172,10 @@ may not be spare power for computing such things at render time.
 
 .. tip::
 
-   The easiest way to create the custom node group is to import an existing glTF model
-   that contains an occlusion map, such as
-   the `water bottle <https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/WaterBottle>`__
-   or another existing model. A manually created custom node group can also be used.
+   If you enable Shader Editor Add-ons in preferences, you will be able to add this custom node group from Menu:
+   Add > Output > glTF Material Output
+
+   .. figure:: /images/addons_import-export_scene-gltf2_addon-preferences-shader.png
 
 glTF stores occlusion in the red (``R``) channel, allowing it to optionally share
 the same image with the roughness and metallic channels.
@@ -257,61 +270,43 @@ All Image Texture nodes used for clearcoat shading should have their *Color Spac
 Sheen
 ^^^^^
 
-When the *Velvet BSDF* node is used in addition to Principled BSDF node, the ``KHR_materials_sheen`` glTF
-extension will be included in the export. The Sheen Color will be exported from Color socket of Vevlet node.
-Sheen Roughness will be exported from Sigma socket.
-
 If a Sheen Roughness Texture is used, glTF requires the values be written to the alpha (``A``) channel.
 
 .. figure:: /images/addons_import-export_scene-gltf2_material-sheen.png
 
 .. tip::
 
-   Velvet BSDF node is only available on Cycles render engine.
-   You may have to temporary switch to Cycles to add this node, and get back to Eevee.
-
-.. note::
-
-   Because the node tree is adding 2 Shaders (Principled and Sheen),
-   the resulting shader is not fully energy conservative.
-   You may find some difference between Blender render, and glTF render.
-   Sheen models are not fully compatible between Blender and glTF.
-   This trick about adding Velvet Shader is the most accurate
-   approximation (better that using Sheen Principled sockets).
+   Sheen BSDF node is only available on Cycles render engine.
+   You may have to temporary switch to Cycles to add this node, and get back to EEVEE.
 
 
 Specular
 ^^^^^^^^
 
-When the *Specular* or *Specular Tint* input of Principled BSDF node have a non default value or
+When the *Specular IOR Level* or *Specular Tint* input of Principled BSDF node have a non default value or
 Image Texture node connected, the ``KHR_materials_specular`` glTF extension will be
 included in the export.
 
-.. note::
 
-   Specular models are not fully compatible between Blender and glTF.
-   By default, Blender data are converted to glTF at export,
-   with a possible loss of information.
-   Some conversion are also performed at import, will a possible loss of information too.
+Anisotropy
+^^^^^^^^^^
 
+Anisotropic textures and data need to be converted at export, and at import.
 
-At import, a custom node group is created, to store original Specular data, not converted.
+At import, some nodes are created to manage this conversion
 
-.. figure:: /images/addons_import-export_scene-gltf2_material_specular-custom-node.png
+.. figure:: /images/addons_import-export_scene-gltf2_material_anisotropy.png
 
-At export, by default, Specular data are converted from Principled BSDF node.
+At export, this exact same nodes are detected, and used to export data.
 
-You can export original Specular data, enabling the option at export.
-If enabled, Principled Specular data are ignored, only data from custom node are used.
+At export, you can also plug some grayscale textures for *Anisotropic* and *Anisotropic Rotation* sockets.
+Then, exporter will convert these texture into a glTF compatible texture.
 
-.. figure:: /images/addons_import-export_scene-gltf2_material_specular-export-option.png
+.. figure:: /images/addons_import-export_scene-gltf2_material_anisotropy-grayscale-texture.png
 
+Note that the *tangent* socket must be linked to a *tangent* node, with UVMap.
+The choosen UVMap must be the UVMap of the Normal Map.
 
-.. tip::
-   If you enable Shader Editor Add-ons in preferences, you will be able to add this custom node group from Menu:
-   Add > Output > glTF Material Output
-
-     .. figure:: /images/addons_import-export_scene-gltf2_addon-preferences-shader.png
 
 Transmission
 ^^^^^^^^^^^^
@@ -326,8 +321,9 @@ In glTF, alpha blending is intended to represent physical materials that are par
 the specified geometry, such as medical gauze wrap. Transmission is intended to represent physical materials
 that are solid but allow non-specularly-reflected light to transmit through the material, like glass.
 
-glTF does not offer a separate "Transmission Roughness", but the material's base roughness
-can be used to blur the transmission, like frosted glass.
+.. tip::
+
+   The material's base roughness can be used to blur the transmission, like frosted glass.
 
 .. tip::
 
@@ -440,8 +436,8 @@ Double-Sided / Backface Culling
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For materials where only the front faces will be visible, turn on *Backface Culling* in
-the *Settings* panel of an Eevee material. When using other engines (Cycles, Workbench)
-you can temporarily switch to Eevee to configure this setting, then switch back.
+the *Settings* panel of an EEVEE material. When using other engines (Cycles, Workbench)
+you can temporarily switch to EEVEE to configure this setting, then switch back.
 
 Leave this box unchecked for double-sided materials.
 
@@ -450,34 +446,42 @@ Leave this box unchecked for double-sided materials.
    The inverse of this setting controls glTF's ``DoubleSided`` flag.
 
 
-Blend Modes
+Alpha Modes
 ^^^^^^^^^^^
 
-The Base Color input can optionally supply alpha values.
-How these values are treated by glTF depends on the selected blend mode.
-
-With the Eevee render engine selected, each material has a Blend Mode on
-the material settings panel. Use this setting to define how alpha values from
-the Base Color channel are treated in glTF. Three settings are supported by glTF:
+glTF has three alpha modes, depending on whether the alpha value is always 1, always 0 or
+1, or can be between 0 and 1. The exporter determines the alpha mode automatically from
+the nodes connected to the Alpha socket.
 
 Opaque
-   Alpha values are ignored.
-Alpha Blend
-   Lower alpha values cause blending with background objects.
-Alpha Clip
-   Alpha values below the *Clip Threshold* setting will cause portions
-   of the material to not be rendered at all. Everything else is rendered as opaque.
+   In *opaque mode*, the material alpha is always 1.
 
-.. figure:: /images/addons_import-export_scene-gltf2_material-alpha-blend.png
+  .. figure:: /images/addons_import-export_scene-gltf2_material-opaque.png
 
-   With the Eevee engine selected, a material's blend modes are configurable.
+Mask
+   In *mask mode*, the material alpha is always 0 or 1. This creates "cutout"
+   transparency, where there is a hard edge between opaque and transparent regions, and
+   can be used for things like leaves or cloth with holes. To enable this mode, use a Math
+   node to round the alpha value to either 0 or 1.
 
-.. note::
+   .. figure:: /images/addons_import-export_scene-gltf2_material-round-alpha.png
 
-   Be aware that transparency (or *Alpha Blend* mode) is complex for real-time engines
-   to render, and may behave in unexpected ways after export. Where possible,
-   use *Alpha Clip* mode instead, or place *Opaque* polygons behind only
-   a single layer of *Alpha Blend* polygons.
+   Rounding snaps alpha values that are 0.5 or greater up to 1, and ones below 0.5 down to
+   1. It is also possible to use a cutoff value different than 0.5 by using Math nodes to
+   do `1 - (alpha < cutoff)`.
+
+   Mask mode is essentially the same as EEVEE's "Alpha Clip" blend mode, but is done with
+   shader nodes so it works in other render engines.
+
+Blend
+   Materials that use neither of these will use *blend mode*. Blend mode allows partially
+   transparent surfaces that tint the objects seen through them, like layers of colored
+   film. However, partial transparency is complex to render, and glTF viewers may show
+   visual artifacts in non-trivial scenes that use blend mode.
+
+   To avoid artifacts, it may be a good idea to separate out parts of a model that can use
+   opaque or mask mode, and use blend mode only on the parts where it is necessary, or to
+   use only a *single* layer of transparent polygons in front of opaque objects.
 
 
 UV Mapping
@@ -513,7 +517,7 @@ These will be written as factors in the glTF file, which are numbers that are mu
 with the specified image textures. These are not common.
 
 - Use Math node (multiply) for scalar factors. Use second value as factor
-- Use MixRGB (multiply) for color factors. Set Fac to 1, and use Color2 as factors
+- Use Mix node (color / multiply) for color factors. Set Factor to 1, and use Color2 (B) as factors
 
 .. figure:: /images/addons_import-export_scene-gltf2_material-factors.png
 
@@ -527,6 +531,16 @@ a typical node structure when several of the above options are applied at once:
 .. figure:: /images/addons_import-export_scene-gltf2_material-principled.png
 
    A Principled BSDF material with an emissive texture.
+
+UDIM
+^^^^
+
+UDIM is a way to store multiple textures in a single image file.
+The UDIM system is supported by Blender, but is not supported by glTF.
+When exporting a model that uses UDIM, the add-on will automatically split the
+image into multiple images, one for each tile, and will update the material
+nodes to use the new images.
+All UDIM texture must use the same UV map to be exported.
 
 
 Exporting a Shadeless (Unlit) Material
@@ -562,12 +576,13 @@ are supported directly by this add-on:
 - ``KHR_materials_volume``
 - ``KHR_materials_sheen``
 - ``KHR_materials_specular``
+- ``KHR_materials_anisotropy``
 - ``KHR_materials_ior``
 - ``KHR_materials_variants``
 - ``KHR_lights_punctual``
 - ``KHR_texture_transform``
 - ``KHR_mesh_quantization``
-
+- ``EXT_mesh_gpu_instancing``
 
 
 .. rubric:: Export
@@ -581,9 +596,11 @@ are supported directly by this add-on:
 - ``KHR_materials_volume``
 - ``KHR_materials_sheen``
 - ``KHR_materials_specular``
+- ``KHR_materials_anisotropy``
 - ``KHR_materials_ior``
 - ``KHR_materials_variants``
 - ``KHR_texture_transform``
+- ``EXT_mesh_gpu_instancing``
 
 
 Third-party glTF Extensions
@@ -660,10 +677,11 @@ Export
 You can export animations using different ways. How glTF animations are made from actions / NLA is controlled by
 the :menuselection:`Animation --> Mode` export option.
 
-.. rubric:: Actions (default)
+Actions (default)
+^^^^^^^^^^^^^^^^^
 
 An action will be exported if it is the active action on an object, or it is stashed to an NLA track
-(e.g. with the *Stash* or *Push Down* buttons in the :doc:`Action Editor </editors/dope_sheet/action>`).
+(e.g. with the *Stash* or *Push Down* buttons in the :doc:`Action Editor </editors/dope_sheet/modes/action>`).
 Actions which are **not** associated with an object in one of these ways are **not exported**.
 If you have multiple actions you want to export, make sure they are stashed!
 
@@ -676,27 +694,30 @@ of the same glTF animation and will play together.
 
 The importer organizes actions so they will be exported correctly with this mode.
 
-This mode is usefull if you are exporting for game engine, with an animation library of a character.
+This mode is useful if you are exporting for game engine, with an animation library of a character.
 Each action must be on its own NLA track.
 
 
-.. rubric:: Active Actions merged
+Active Actions merged
+^^^^^^^^^^^^^^^^^^^^^
 
 In this mode, the NLA organization is not used, and only one animation is exported using
 the active actions on all objects.
 
-.. rubric:: NLA Tracks
+NLA Tracks
+^^^^^^^^^^
 
-In this mode, each NLA Track will be export as an independant glTF animation.
-This mode is usefull if you are using Strip modifiers, or if you get multiple action on a same Track.
+In this mode, each NLA Track will be export as an independent glTF animation.
+This mode is useful if you are using Strip modifiers, or if you get multiple action on a same Track.
 
 If you rename two tracks on two different objects to the same name, they will become part
 of the same glTF animation and will play together.
 
-.. rubric:: Scene
+Scene
+^^^^^
 
-Using _Scene_ option, animations will be exported as you can see them in viewport.
-You can choose to export a single glTF animation, or each object separatly.
+Using `Scene`_ option, animations will be exported as you can see them in viewport.
+You can choose to export a single glTF animation, or each object separately.
 
 .. note::
 
@@ -715,7 +736,7 @@ You can choose to export a single glTF animation, or each object separatly.
 
 .. note::
 
-   Only _Actions_ and _Active Actions merged_ mode can handle not sampled animations.
+   Only `Actions (default)`_ and `Active Actions merged`_ mode can handle not sampled animations.
 
 
 File Format Variations
@@ -766,6 +787,7 @@ the asset must be shared over a plain-text-only connection.
 .. warning::
 
    This is the least efficient of the available forms, and should only be used when required.
+   Available only when you activated it in addon preferences.
 
 
 Properties
@@ -790,11 +812,16 @@ Bone Direction
    Changes the heuristic the importer uses to decide where to place bone tips.
    Note that the Fortune setting may cause inaccuracies in models that use non-uniform scaling.
    Otherwise this is purely aesthetic.
+   The default value will not change axis, and is best for re-exporting from Blender.
+   This default option will change display mode (adding shape and changing relationship line) to have a better view,
+   even if original bones axis are not the most accurate (estheticaly speaking)
 Lighting Mode
    Optional backwards compatibility for non-standard render engines. Applies to lights.
    Standard: Physically-based glTF lighting units (cd, lx, nt).
    Unitless: Non-physical, unitless lighting. Useful when exposure controls are not available
    Raw (Deprecated): Blender lighting strengths with no conversion
+Import WebP textures
+   If a texture exists in WebP format, loads the WebP texture instead of the fallback png/jpg one.
 
 
 Export
@@ -804,8 +831,8 @@ Format
    See: `File Format Variations`_.
 Keep Original
    For glTF Separate file format only. Keep original textures files if possible.
-   Warning: if you use more than one texture, where pbr standard requires only one,
-   only one texture will be used.This can lead to unexpected results
+   Warning: if you use more than one texture, where PBR standard requires only one,
+   only one texture will be used. This can lead to unexpected results
 Textures
    For glTF Separate file format only. Folder to place texture files in. Relative to the gltf-file.
 Copyright
@@ -846,6 +873,23 @@ Y Up
    Export using glTF convention, +Y up.
 
 
+Data - Scene Graph
+^^^^^^^^^^^^^^^^^^
+
+Geometry Nodes Instances
+   Export Geometry nodes instances. This feature is experimental.
+
+GPU Instances
+   Export using ``EXT_mesh_gpu_instancing`` extensions.
+
+Flatten Object Hierarchy
+   Useful in case of non-decomposable TRS matrix. Only skined meshes will stay children of armature.
+
+Full Collection Hierarchy
+   Export collections as empty, keeping full hierarchy. If an object is in multiple collections,
+   it will be exported it only once, in the first collection it is found.
+
+
 Data - Mesh
 ^^^^^^^^^^^
 
@@ -858,39 +902,75 @@ Normals
    Export vertex normals with meshes.
 Tangents
    Export vertex tangents with meshes.
-Vertex Colors
-   Export Color Attributes with meshes.
 Attributes
    Export Attributes with meshes, when the name starts with underscore.
 Loose Edges
    Export loose edges as lines, using the material from the first material slot.
 Loose Points
    Export loose points as glTF points, using the material from the first material slot.
+Shared Accessor
+   For triangles, use shared accessor for indices. This is more efficient (smaller files when you have lots of
+   materials).
+
+
+Data - Mesh - Vertex Color
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+Use Vertex Color
+   :Material:
+      Export vertex color when used in material node tree as Base Color multiplier.
+      This is the default, and the most accurate regarding glTF specification.
+   :Active:
+      Export active vertex colors, even if not used in material node tree.
+      A fully compliant glTF viewer should display this VC as Base Color multiplier.
+   :None:
+      Do not export vertex color.
+Export all vertex colors
+   Export all vertex colors, additional VC will be COLOR_1, COLOR_2, etc.
+Export active vertex color when no material
+   Export active vertex color when no material is assigned to the object.
+
 
 Data - Material
 ^^^^^^^^^^^^^^^
 
 Materials
    Export full materials, only placeholders (all primitives but without materials),
-   or does not export materials. (In that last case, primitive are merged, lossing material slot information).
+   or does not export materials. (In that last case, primitives are merged, losing material slot information).
 Images
    Output format for images. PNG is lossless and generally preferred, but JPEG might be preferable for
    web applications due to the smaller file size.
+   If WebP is chosen, all textures will be saved as WebP, without any png/jpg fallback.
    If None is chosen, materials are exported without textures.
-JPEG Quality
-   When exporting jpeg files, the quality of the exported file.
-Export Original PBR Specular
-   When On, specular data are exported from glTF Material Output node,
-   Instead of using sockets from Principled BSDF Node.
+Image Quality
+   When exporting jpeg or WebP files, the quality of the exported file.
+Create WebP
+   Creates WebP textures for every textures, in addition to the existing texture.
+   For already WebP textures, nothing happen.
+WebP fallback
+   For all WebP textures, create a png fallback texture.
+Unused images
+   Export images that are not used in any material.
+Unused textures
+   Export texture info (sampler, image, texcoord) that are not used in any material.
 
 Data - Shape Keys
 ^^^^^^^^^^^^^^^^^
+
 Export shape keys (morph targets).
 
 Shape Key Normals
    Export vertex normals with shape keys (morph targets).
 Shape Key Tangents
    Export vertex tangents with shape keys (morph targets).
+
+Data - Shape Keys - Optimize
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Use Sparse Accessor if better
+   Sparse Accessor will be used if it save space (if the exported file is smaller)
+Omitting Sparse Accessor if data is empty
+   If data is empty, omit to export SParce Accessor. Not all viewer managed it correctly, so this option is Off by
+   default
 
 Data - Armature
 ^^^^^^^^^^^^^^^
@@ -900,16 +980,22 @@ Use Rest Position Armature
 Export Deformation Bones only
    Export Deformation bones only, not other bones.
    Animation for deformation bones are baked.
+Remove Armature Object
+   Remove Armature Objects if possible. If some armature(s) have multiple root bones, we can't remove them.
 Flatten Bone Hierarchy
-   Usefull in case of non decomposible TRS matrix.
+   Useful in case of non-decomposable TRS matrix.
 
 Data - Skinning
 ^^^^^^^^^^^^^^^
 
 Export skinning data
 
+Bone influences
+   How many joint verex influences will be exported. Models may appear incorrectly in many viewers with value
+   different to 4 or 8.
+
 Include All Bone Influences
-   Allow more than 4 joint vertex influences. Models may appear incorrectly in many viewers.
+   Export all joint vertex influences. Models may appear incorrectly in many viewers.
 
 Data - Lighting
 ^^^^^^^^^^^^^^^
@@ -948,7 +1034,7 @@ Animation mode
 Shape Keys Animations
    Export Shape Keys Animation. Need Shape Keys to be exported (See `Data - Shape Keys`_)
 Bake All Objects Animations
-   Usefull when some objects are constrained without being animated themselves.
+   Useful when some objects are constrained without being animated themselves.
 
 
 Animation - Rest & Ranges
@@ -959,7 +1045,7 @@ Use Current Frame as Object Rest Transformations
 Limit to Playback Range
    Clips animations to selected playback range.
 Set all glTF Animation starting at 0
-   Set all glTF Animation starting at 0. Can be usefull for looping animation
+   Set all glTF Animation starting at 0. Can be useful for looping animation
 Negative Frames
    When some frames are in negative range, slide or crop the animation.
 
@@ -990,7 +1076,14 @@ Optimize Animation Size
 Force keeping channel for armature / bones
    if all keyframes are identical in a rig, force keeping the minimal animation.
 Force keeping channel for objects
-   if all keyframes are identical for object transformations, force keeping the minimal animation
+   if all keyframes are identical for object transformations, force keeping the minimal animation.
+Disable viewport for other objects
+   When exporting animations, disable viewport for other objects, for performance reasons, when possible.
+
+Animation - Filter
+^^^^^^^^^^^^^^^^^^
+
+Restrict actions to be exported to the ones matching the filter.
 
 Contributing
 ============

@@ -10,8 +10,8 @@ on:
 
 env:
   CI: true
-  BLENDER_MAJOR: 3
-  BLENDER_MINOR: 6
+  BLENDER_MAJOR: 4
+  BLENDER_MINOR: 2
 
 jobs:
   build:
@@ -61,7 +61,7 @@ jobs:
       run: |
         sudo ln -s /opt/blender/blender /usr/local/bin/blender
         blender --version
-        ADDON_DIR=/opt/blender/$BLENDER_MAJOR.$BLENDER_MINOR/scripts/addons
+        ADDON_DIR=/opt/blender/$BLENDER_MAJOR.$BLENDER_MINOR/scripts/addons_core
         rm -rf $ADDON_DIR/io_scene_gltf2
         cp -r addons/io_scene_gltf2 $ADDON_DIR
         cd tests

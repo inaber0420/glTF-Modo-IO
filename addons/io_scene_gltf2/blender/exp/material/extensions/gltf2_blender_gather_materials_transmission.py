@@ -14,45 +14,65 @@
 
 import bpy
 from .....io.com.gltf2_io_extensions import Extension
-from ....exp import gltf2_blender_get
 from ...material import gltf2_blender_gather_texture_info
+from ..gltf2_blender_search_node_tree import \
+    has_image_node_from_socket, \
+    get_socket, \
+    get_factor_from_socket
 
 def export_transmission(blender_material, export_settings):
-    transmission_enabled = False
     has_transmission_texture = False
 
     transmission_extension = {}
     transmission_slots = ()
 
-    transmission_socket = gltf2_blender_get.get_socket(blender_material, 'Transmission')
+    transmission_socket = get_socket(blender_material.node_tree, blender_material.use_nodes, 'Transmission Weight')
 
-    if isinstance(transmission_socket, bpy.types.NodeSocket) and not transmission_socket.is_linked:
-        transmission_extension['transmissionFactor'] = transmission_socket.default_value
-        transmission_enabled = transmission_extension['transmissionFactor'] > 0
-    elif gltf2_blender_get.has_image_node_from_socket(transmission_socket):
-        fac = gltf2_blender_get.get_factor_from_socket(transmission_socket, kind='VALUE')
+    if transmission_socket.socket is not None and isinstance(transmission_socket.socket, bpy.types.NodeSocket) and not transmission_socket.socket.is_linked:
+        if transmission_socket.socket.default_value != 0.0:
+            transmission_extension['transmissionFactor'] = transmission_socket.socket.default_value
+
+        path_ = {}
+        path_['length'] = 1
+        path_['path'] = "/materials/XXX/extensions/KHR_materials_transmission/transmissionFactor"
+        export_settings['current_paths']["node_tree." + transmission_socket.socket.path_from_id() + ".default_value"] = path_
+
+    elif has_image_node_from_socket(transmission_socket, export_settings):
+        fac, path = get_factor_from_socket(transmission_socket, kind='VALUE')
         transmission_extension['transmissionFactor'] = fac if fac is not None else 1.0
         has_transmission_texture = True
-        transmission_enabled = True
 
-    if not transmission_enabled:
-        return None, None
+        # Storing path for KHR_animation_pointer
+        if path is not None:
+            path_ = {}
+            path_['length'] = 1
+            path_['path'] = "/materials/XXX/extensions/KHR_materials_transmission/transmissionFactor"
+            export_settings['current_paths'][path] = path_
+
+    uvmap_info = {}
+    udim_info = {}
 
     # Pack transmission channel (R).
     if has_transmission_texture:
         transmission_slots = (transmission_socket,)
 
-    use_actives_uvmaps = []
-
     if len(transmission_slots) > 0:
-        combined_texture, use_active_uvmap, _ = gltf2_blender_gather_texture_info.gather_texture_info(
+        combined_texture, uvmap_info, udim_info, _ = gltf2_blender_gather_texture_info.gather_texture_info(
             transmission_socket,
             transmission_slots,
             export_settings,
         )
         if has_transmission_texture:
             transmission_extension['transmissionTexture'] = combined_texture
-        if use_active_uvmap:
-            use_actives_uvmaps.append("transmissionTexture")
 
-    return Extension('KHR_materials_transmission', transmission_extension, False), use_actives_uvmaps
+        if len(export_settings['current_texture_transform']) != 0:
+            for k in export_settings['current_texture_transform'].keys():
+                path_ = {}
+                path_['length'] = export_settings['current_texture_transform'][k]['length']
+                path_['path'] = export_settings['current_texture_transform'][k]['path'].replace("YYY", "extensions/KHR_materials_transmission/transmissionTexture/extensions")
+                path_['vector_type'] = export_settings['current_texture_transform'][k]['vector_type']
+                export_settings['current_paths'][k] = path_
+
+        export_settings['current_texture_transform'] = {}
+
+    return Extension('KHR_materials_transmission', transmission_extension, False), {'transmissionTexture': uvmap_info}, {'transmissionTexture': udim_info} if len(udim_info) > 0 else {}

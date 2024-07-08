@@ -42,7 +42,7 @@ class BlenderMaterial():
 
         set_extras(mat, pymaterial.extras)
         BlenderMaterial.set_double_sided(pymaterial, mat)
-        BlenderMaterial.set_alpha_mode(pymaterial, mat)
+        BlenderMaterial.set_eevee_surface_render_method(pymaterial, mat)
         BlenderMaterial.set_viewport_color(pymaterial, mat, vertex_color)
 
         mat.use_nodes = True
@@ -54,15 +54,23 @@ class BlenderMaterial():
         exts = pymaterial.extensions or {}
         if 'KHR_materials_unlit' in exts:
             unlit(mh)
+            pymaterial.pbr_metallic_roughness.blender_nodetree = mat.node_tree #Used in case of for KHR_animation_pointer
+            pymaterial.pbr_metallic_roughness.blender_mat = mat #Used in case of for KHR_animation_pointer #TODOPointer Vertex Color...
         elif 'KHR_materials_pbrSpecularGlossiness' in exts:
             pbr_specular_glossiness(mh)
         else:
             pbr_metallic_roughness(mh)
+            pymaterial.pbr_metallic_roughness.blender_nodetree = mat.node_tree #Used in case of for KHR_animation_pointer
+            pymaterial.pbr_metallic_roughness.blender_mat = mat #Used in case of for KHR_animation_pointer #TODOPointer Vertex Color...
+
 
         # Manage KHR_materials_variants
         # We need to store link between material idx in glTF and Blender Material id
         if gltf.KHR_materials_variants is True:
             gltf.variant_mapping[str(material_idx) + str(vertex_color)] = mat
+
+        pymaterial.blender_nodetree = mat.node_tree #Used in case of for KHR_animation_pointer
+        pymaterial.blender_mat = mat #Used in case of for KHR_animation_pointer #TODOPointer Vertex Color...
 
         import_user_extensions('gather_import_material_after_hook', gltf, pymaterial, vertex_color, mat)
 
@@ -71,15 +79,12 @@ class BlenderMaterial():
         mat.use_backface_culling = (pymaterial.double_sided != True)
 
     @staticmethod
-    def set_alpha_mode(pymaterial, mat):
-        alpha_mode = pymaterial.alpha_mode
-        if alpha_mode == 'BLEND':
-            mat.blend_method = 'BLEND'
-        elif alpha_mode == 'MASK':
-            mat.blend_method = 'CLIP'
-            alpha_cutoff = pymaterial.alpha_cutoff
-            alpha_cutoff = alpha_cutoff if alpha_cutoff is not None else 0.5
-            mat.alpha_threshold = alpha_cutoff
+    def set_eevee_surface_render_method(pymaterial, mat):
+        alpha_mode = pymaterial.alpha_mode or 'OPAQUE'
+        if alpha_mode in ['OPAQUE', 'MASK']:
+            mat.surface_render_method = 'DITHERED'
+        else:
+            mat.surface_render_method = 'BLENDED'
 
     @staticmethod
     def set_viewport_color(pymaterial, mat, vertex_color):

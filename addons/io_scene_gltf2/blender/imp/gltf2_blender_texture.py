@@ -46,11 +46,13 @@ def texture(
     tex_img = mh.node_tree.nodes.new('ShaderNodeTexImage')
     tex_img.location = x - 240, y
     tex_img.label = label
+
     # Get image
     if forced_image is None:
-        if pytexture.source is not None:
-            BlenderImage.create(mh.gltf, pytexture.source)
-            pyimg = mh.gltf.data.images[pytexture.source]
+        source = get_source(mh, pytexture)
+        if source is not None:
+            BlenderImage.create(mh.gltf, source)
+            pyimg = mh.gltf.data.images[source]
             blender_image_name = pyimg.blender_image_name
             if blender_image_name:
                 tex_img.image = bpy.data.images[blender_image_name]
@@ -143,6 +145,25 @@ def texture(
 
     # UV Transform (for KHR_texture_transform)
     needs_tex_transform = 'KHR_texture_transform' in (tex_info.extensions or {})
+
+    # We also need to create tex transform if this property is animated in KHR_animation_pointer
+    if mh.gltf.data.extensions_used is not None and "KHR_animation_pointer" in mh.gltf.data.extensions_used:
+        if tex_info.extensions is not None and "KHR_texture_transform" in tex_info.extensions:
+            if len(tex_info.extensions["KHR_texture_transform"]["animations"]) > 0:
+                for anim_idx in tex_info.extensions["KHR_texture_transform"]["animations"].keys():
+                    for channel_idx in tex_info.extensions["KHR_texture_transform"]["animations"][anim_idx]:
+                        channel = mh.gltf.data.animations[anim_idx].channels[channel_idx]
+                        pointer_tab = channel.target.extensions["KHR_animation_pointer"]["pointer"].split("/")
+                        if len(pointer_tab) >= 7 and pointer_tab[1] == "materials" and \
+                                pointer_tab[-3] == "extensions" and \
+                                pointer_tab[-2] == "KHR_texture_transform" and \
+                                pointer_tab[-1] in ["scale", "offset", "rotation"]:
+                            needs_tex_transform = True
+                            # Store multiple channel data, as we will need all channels to convert to blender data when animated
+                            if "multiple_channels" not in tex_info.extensions['KHR_texture_transform'].keys():
+                                tex_info.extensions['KHR_texture_transform']["multiple_channels"] = {}
+                            tex_info.extensions['KHR_texture_transform']["multiple_channels"][pointer_tab[-1]] = (anim_idx, channel_idx)
+
     if needs_tex_transform:
         mapping = mh.node_tree.nodes.new('ShaderNodeMapping')
         mapping.location = x - 160, y + 30
@@ -163,6 +184,8 @@ def texture(
         x -= 260
         needs_uv_map = True
 
+        tex_info.extensions['KHR_texture_transform']['blender_nodetree'] = mh.node_tree # Needed for KHR_animation_pointer
+
     # UV Map
     uv_idx = tex_info.tex_coord or 0
     try:
@@ -177,6 +200,20 @@ def texture(
         mh.node_tree.links.new(uv_socket, uv_map.outputs[0])
 
     import_user_extensions('gather_import_texture_after_hook', mh.gltf, pytexture, mh.node_tree, mh, tex_info, location, label, color_socket, alpha_socket, is_data)
+
+
+def get_source(mh, pytexture):
+    src = pytexture.source
+    try:
+        webp_src = pytexture.extensions['EXT_texture_webp']['source']
+    except Exception:
+        webp_src = None
+
+    if mh.gltf.import_settings['import_webp_texture']:
+        return webp_src if webp_src is not None else src
+    else:
+        return src if src is not None else webp_src
+
 
 def set_filtering(tex_img, pysampler):
     """Set the filtering/interpolation on an Image Texture from the glTf sampler."""

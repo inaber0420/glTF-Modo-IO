@@ -14,6 +14,7 @@
 
 import bpy
 import typing
+from .....blender.com.gltf2_blender_data_path import get_sk_exported
 from ....com.gltf2_blender_data_path import get_target_object_path
 from ...gltf2_blender_gather_cache import cached
 from ..gltf2_blender_gather_keyframes import Keyframe
@@ -25,11 +26,12 @@ def gather_fcurve_keyframes(
         channel_group: typing.Tuple[bpy.types.FCurve],
         bone: typing.Optional[str],
         custom_range: typing.Optional[set],
+        extra_mode: bool,
         export_settings):
 
     keyframes = []
 
-    non_keyed_values = __gather_non_keyed_values(obj_uuid, channel_group, bone, export_settings)
+    non_keyed_values = gather_non_keyed_values(obj_uuid, channel_group, bone, extra_mode, export_settings)
 
     # Just use the keyframes as they are specified in blender
     # Note: channels has some None items only for SK if some SK are not animated
@@ -54,7 +56,7 @@ def gather_fcurve_keyframes(
         key.value = [c.evaluate(frame) for c in channel_group if c is not None]
         # Complete key with non keyed values, if needed
         if len([c for c in channel_group if c is not None]) != key.get_target_len():
-            __complete_key(key, non_keyed_values)
+            complete_key(key, non_keyed_values)
 
         # compute tangents for cubic spline interpolation
         if [c for c in channel_group if c is not None][0].keyframe_points[0].interpolation == "BEZIER":
@@ -96,12 +98,17 @@ def gather_fcurve_keyframes(
     return keyframes
 
 
-def __gather_non_keyed_values(
+def gather_non_keyed_values(
         obj_uuid: str,
         channel_group: typing.Tuple[bpy.types.FCurve],
         bone: typing.Optional[str],
+        extra_mode: bool,
         export_settings
         ) ->  typing.Tuple[typing.Optional[float]]:
+
+    if extra_mode is True:
+        # No need to check if there are non non keyed values, as we export fcurve independently
+        return [None]
 
     blender_object = export_settings['vtree'].nodes[obj_uuid].blender_object
 
@@ -141,7 +148,7 @@ def __gather_non_keyed_values(
             if i in indices:
                 non_keyed_values.append(None)
             else:
-                if bone is None is None:
+                if bone is None:
                     non_keyed_values.append({
                         "delta_location" : blender_object.delta_location,
                         "delta_rotation_euler" : blender_object.delta_rotation_euler,
@@ -174,24 +181,20 @@ def __gather_non_keyed_values(
         if object_path:
             shapekeys_idx = {}
             cpt_sk = 0
-            for sk in blender_object.data.shape_keys.key_blocks:
-                if sk == sk.relative_key:
-                    continue
-                if sk.mute is True:
-                    continue
+            for sk in get_sk_exported(blender_object.data.shape_keys.key_blocks):
                 shapekeys_idx[cpt_sk] = sk.name
                 cpt_sk += 1
 
-        for idx_c, channel in enumerate(channel_group):
-            if channel is None:
-                non_keyed_values.append(blender_object.data.shape_keys.key_blocks[shapekeys_idx[idx_c]].value)
-            else:
-                non_keyed_values.append(None)
+            for idx_c, channel in enumerate(channel_group):
+                if channel is None:
+                    non_keyed_values.append(blender_object.data.shape_keys.key_blocks[shapekeys_idx[idx_c]].value)
+                else:
+                    non_keyed_values.append(None)
 
         return tuple(non_keyed_values)
 
 
-def __complete_key(key: Keyframe, non_keyed_values: typing.Tuple[typing.Optional[float]]):
+def complete_key(key: Keyframe, non_keyed_values: typing.Tuple[typing.Optional[float]]):
     """
     Complete keyframe with non keyed values
     """
@@ -211,4 +214,3 @@ def __complete_key_tangents(key: Keyframe, non_keyed_values: typing.Tuple[typing
             key.set_value_index_in(i, non_keyed_values[i])
         if key.out_tangent is not None:
             key.set_value_index_out(i, non_keyed_values[i])
-

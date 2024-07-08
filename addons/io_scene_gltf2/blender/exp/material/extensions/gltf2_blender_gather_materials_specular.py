@@ -14,168 +14,129 @@
 
 import bpy
 from .....io.com.gltf2_io_extensions import Extension
-from .....io.com.gltf2_io_constants import GLTF_IOR
-from ....exp import gltf2_blender_get
-from ....com.gltf2_blender_default import BLENDER_SPECULAR, BLENDER_SPECULAR_TINT
-from ...material import gltf2_blender_gather_texture_info
+from ...material.gltf2_blender_gather_texture_info import gather_texture_info
+from ..gltf2_blender_search_node_tree import \
+    has_image_node_from_socket, \
+    get_socket, \
+    get_factor_from_socket
 
-def export_original_specular(blender_material, export_settings):
-    specular_extension = {}
-
-    original_specular_socket = gltf2_blender_get.get_socket_old(blender_material, 'Specular')
-    original_specularcolor_socket = gltf2_blender_get.get_socket_old(blender_material, 'Specular Color')
-
-    if original_specular_socket is None or original_specularcolor_socket is None:
-        return None, None
-
-    specular_non_linked = isinstance(original_specular_socket, bpy.types.NodeSocket) and not original_specular_socket.is_linked
-    specularcolor_non_linked = isinstance(original_specularcolor_socket, bpy.types.NodeSocket) and not original_specularcolor_socket.is_linked
-
-
-    use_actives_uvmaps = []
-
-    if specular_non_linked is True:
-        fac = original_specular_socket.default_value
-        if fac != 1.0:
-            specular_extension['specularFactor'] = fac
-    else:
-        # Factor
-        fac = gltf2_blender_get.get_factor_from_socket(original_specular_socket, kind='VALUE')
-        if fac is not None and fac != 1.0:
-            specular_extension['specularFactor'] = fac
-
-        # Texture
-        if gltf2_blender_get.has_image_node_from_socket(original_specular_socket):
-            original_specular_texture, original_specular_use_active_uvmap, _ = gltf2_blender_gather_texture_info.gather_texture_info(
-                original_specular_socket,
-                (original_specular_socket,),
-                export_settings,
-            )
-            specular_extension['specularTexture'] = original_specular_texture
-            if original_specular_use_active_uvmap:
-                use_actives_uvmaps.append("specularTexture")
-
-
-    if specularcolor_non_linked is True:
-        color = original_specularcolor_socket.default_value[:3]
-        if color != [1.0, 1.0, 1.0]:
-            specular_extension['specularColorFactor'] = color
-    else:
-        # Factor
-        fac = gltf2_blender_get.get_factor_from_socket(original_specularcolor_socket, kind='RGB')
-        if fac is not None and fac != [1.0, 1.0, 1.0]:
-            specular_extension['specularColorFactor'] = fac
-
-        # Texture
-        if gltf2_blender_get.has_image_node_from_socket(original_specularcolor_socket):
-            original_specularcolor_texture, original_specularcolor_use_active_uvmap, _ = gltf2_blender_gather_texture_info.gather_texture_info(
-                original_specularcolor_socket,
-                (original_specularcolor_socket,),
-                export_settings,
-            )
-            specular_extension['specularColorTexture'] = original_specularcolor_texture
-            if original_specularcolor_use_active_uvmap:
-                use_actives_uvmaps.append("specularColorTexture")
-
-    return Extension('KHR_materials_specular', specular_extension, False), use_actives_uvmaps
 
 def export_specular(blender_material, export_settings):
-
-    if export_settings['gltf_original_specular'] is True:
-        return export_original_specular(blender_material, export_settings)
-
     specular_extension = {}
-    specular_ext_enabled = False
 
-    specular_socket = gltf2_blender_get.get_socket(blender_material, 'Specular')
-    specular_tint_socket = gltf2_blender_get.get_socket(blender_material, 'Specular Tint')
-    base_color_socket = gltf2_blender_get.get_socket(blender_material, 'Base Color')
-    transmission_socket = gltf2_blender_get.get_socket(blender_material, 'Transmission')
-    ior_socket = gltf2_blender_get.get_socket(blender_material, 'IOR')
+    specular_socket = get_socket(blender_material.node_tree, blender_material.use_nodes, 'Specular IOR Level')
+    speculartint_socket = get_socket(blender_material.node_tree, blender_material.use_nodes, 'Specular Tint')
 
-    if base_color_socket is None:
-        return None, None
+    if specular_socket.socket is None or speculartint_socket.socket is None:
+        return None, {}, {}
 
-    # TODOExt replace by __has_image_node_from_socket calls
-    specular_not_linked = isinstance(specular_socket, bpy.types.NodeSocket) and not specular_socket.is_linked
-    specular_tint_not_linked = isinstance(specular_tint_socket, bpy.types.NodeSocket) and not specular_tint_socket.is_linked
-    base_color_not_linked = isinstance(base_color_socket, bpy.types.NodeSocket) and not base_color_socket.is_linked
-    transmission_not_linked = isinstance(transmission_socket, bpy.types.NodeSocket) and not transmission_socket.is_linked
-    ior_not_linked = isinstance(ior_socket, bpy.types.NodeSocket) and not ior_socket.is_linked
+    uvmap_infos = {}
+    udim_infos = {}
 
-    specular = specular_socket.default_value if specular_not_linked else None
-    specular_tint = specular_tint_socket.default_value if specular_tint_not_linked else None
-    transmission = transmission_socket.default_value if transmission_not_linked else None
-    ior = ior_socket.default_value if ior_not_linked else GLTF_IOR   # textures not supported #TODOExt add warning?
-    base_color = base_color_socket.default_value[0:3]
+    specular_non_linked = specular_socket.socket is not None and isinstance(specular_socket.socket, bpy.types.NodeSocket) and not specular_socket.socket.is_linked
+    specularcolor_non_linked = speculartint_socket.socket is not None and isinstance(speculartint_socket.socket, bpy.types.NodeSocket) and not speculartint_socket.socket.is_linked
 
-    no_texture = (transmission_not_linked and specular_not_linked and specular_tint_not_linked and
-        (specular_tint == 0.0 or (specular_tint != 0.0 and base_color_not_linked)))
+    if specular_non_linked is True:
+        fac = specular_socket.socket.default_value
+        fac = fac * 2.0
+        if fac < 1.0:
+            specular_extension['specularFactor'] = fac
+        elif fac > 1.0:
+            # glTF specularFactor should be <= 1.0, so we will multiply ColorFactory by specularFactor, and set SpecularFactor to 1.0 (default value)
+            pass
+        else:
+            pass # If fac == 1.0, no need to export specularFactor, the default value is 1.0
 
-    use_actives_uvmaps = []
+        # Storing path for KHR_animation_pointer
+        path_ = {}
+        path_['length'] = 1
+        path_['path'] = "/materials/XXX/extensions/KHR_materials_specular/specularFactor"
+        export_settings['current_paths']["node_tree." + specular_socket.socket.path_from_id() + ".default_value"] = path_
 
-    if no_texture:
-        if specular != BLENDER_SPECULAR or specular_tint != BLENDER_SPECULAR_TINT:
-            import numpy as np
-            # See https://gist.github.com/proog128/d627c692a6bbe584d66789a5a6437a33
-            specular_ext_enabled = True
-
-            def normalize(c):
-                luminance = lambda c: 0.3 * c[0] + 0.6 * c[1] + 0.1 * c[2]
-                assert(len(c) == 3)
-                l = luminance(c)
-                if l == 0:
-                    return np.array(c)
-                return np.array([c[0] / l, c[1] / l, c[2] / l])
-
-            f0_from_ior = ((ior - 1)/(ior + 1))**2
-            if f0_from_ior == 0:
-                specular_color = [1.0, 1.0, 1.0]
-            else:
-                tint_strength = (1 - specular_tint) + normalize(base_color) * specular_tint
-                specular_color = (1 - transmission) * (1 / f0_from_ior) * 0.08 * specular * tint_strength + transmission * tint_strength
-                specular_color = list(specular_color)
-            specular_extension['specularColorFactor'] = specular_color
     else:
-        if specular_not_linked and specular == BLENDER_SPECULAR and specular_tint_not_linked and specular_tint == BLENDER_SPECULAR_TINT:
-            return None, None
+        # Factor
+        fac, path = get_factor_from_socket(specular_socket, kind='VALUE')
+        if fac is not None and fac != 1.0:
+            fac = fac * 2.0 if fac is not None else None
+            if fac is not None and fac < 1.0:
+                specular_extension['specularFactor'] = fac
+            elif fac is not None and fac > 1.0:
+                # glTF specularFactor should be <= 1.0, so we will multiply ColorFactory by specularFactor, and set SpecularFactor to 1.0 (default value)
+                pass
 
-        # Trying to identify cases where exporting a texture will not be needed
-        if specular_not_linked and transmission_not_linked and \
-            specular == 0.0 and transmission == 0.0:
+        if path is not None:
+            path_ = {}
+            path_['length'] = 1
+            path_['path'] = "/materials/XXX/extensions/KHR_materials_specular/specularFactor"
+            export_settings['current_paths'][path] = path_
 
-            specular_extension['specularColorFactor'] = [0.0, 0.0, 0.0]
-            return specular_extension, []
+        # Texture
+        if has_image_node_from_socket(specular_socket, export_settings):
+            specular_texture, uvmap_info, udim_info, _ = gather_texture_info(
+                specular_socket,
+                (specular_socket,),
+                export_settings,
+            )
+            specular_extension['specularTexture'] = specular_texture
+            uvmap_infos.update({'specularTexture': uvmap_info})
+            udim_infos.update({'specularTexture': udim_info} if len(udim_info) > 0 else {})
 
+            if len(export_settings['current_texture_transform']) != 0:
+                for k in export_settings['current_texture_transform'].keys():
+                    path_ = {}
+                    path_['length'] = export_settings['current_texture_transform'][k]['length']
+                    path_['path'] = export_settings['current_texture_transform'][k]['path'].replace("YYY", "extensions/KHR_materials_specular/specularTexture/extensions")
+                    path_['vector_type'] = export_settings['current_texture_transform'][k]['vector_type']
+                    export_settings['current_paths'][k] = path_
 
-        # There will be a texture, with a complex calculation (no direct channel mapping)
-        sockets = (specular_socket, specular_tint_socket, base_color_socket, transmission_socket, ior_socket)
-        # Set primary socket having a texture
-        primary_socket = specular_socket
-        if specular_not_linked:
-            primary_socket = specular_tint_socket
-            if specular_tint_not_linked:
-                primary_socket = base_color_socket
-                if base_color_not_linked:
-                    primary_socket = transmission_socket
+            export_settings['current_texture_transform'] = {}
 
-        specularColorTexture, use_active_uvmap, specularColorFactor = gltf2_blender_gather_texture_info.gather_texture_info(
-            primary_socket,
-            sockets,
-            export_settings,
-            filter_type='ANY')
-        if specularColorTexture is None:
-            return None, None
-        if use_active_uvmap:
-            use_actives_uvmaps.append("specularColorTexture")
+    if specularcolor_non_linked is True:
+        color = speculartint_socket.socket.default_value[:3]
+        if fac is not None and fac > 1.0:
+            color = (color[0] * fac, color[1] * fac, color[2] * fac)
+        if color != (1.0, 1.0, 1.0):
+            specular_extension['specularColorFactor'] = color
 
-        specular_ext_enabled = True
-        specular_extension['specularColorTexture'] = specularColorTexture
+         # Storing path for KHR_animation_pointer
+        path_ = {}
+        path_['length'] = 1
+        path_['path'] = "/materials/XXX/extensions/KHR_materials_specular/specularColorFactor"
+        export_settings['current_paths']["node_tree." + speculartint_socket.socket.path_from_id() + ".default_value"] = path_
+    else:
+        # Factor
+        fac_color, path = get_factor_from_socket(speculartint_socket, kind='RGB')
+        if fac_color is not None and fac is not None and fac > 1.0:
+            fac_color = (fac_color[0] * fac, fac_color[1] * fac, fac_color[2] * fac)
+        elif fac_color is None and fac is not None and fac > 1.0:
+            fac_color = (fac, fac, fac)
+        if fac_color != (1.0, 1.0, 1.0):
+            specular_extension['specularColorFactor'] = fac_color
 
+        if path is not None:
+            path_ = {}
+            path_['length'] = 1
+            path_['path'] = "/materials/XXX/extensions/KHR_materials_specular/specularColorFactor"
+            export_settings['current_paths'][path] = path_
 
-        if specularColorFactor is not None:
-            specular_extension['specularColorFactor'] = specularColorFactor
+        # Texture
+        if has_image_node_from_socket(speculartint_socket, export_settings):
+            specularcolor_texture, uvmap_info, udim_info, _ = gather_texture_info(
+                speculartint_socket,
+                (speculartint_socket,),
+                export_settings,
+            )
+            specular_extension['specularColorTexture'] = specularcolor_texture
+            uvmap_infos.update({'specularColorTexture': uvmap_info})
 
+    if len(export_settings['current_texture_transform']) != 0:
+        for k in export_settings['current_texture_transform'].keys():
+            path_ = {}
+            path_['length'] = export_settings['current_texture_transform'][k]['length']
+            path_['path'] = export_settings['current_texture_transform'][k]['path'].replace("YYY", "extensions/KHR_materials_specular/specularColorTexture/extensions")
+            path_['vector_type'] = export_settings['current_texture_transform'][k]['vector_type']
+            export_settings['current_paths'][k] = path_
 
-    specular_extension = Extension('KHR_materials_specular', specular_extension, False) if specular_ext_enabled else None
-    return specular_extension, use_actives_uvmaps
+    export_settings['current_texture_transform'] = {}
+
+    return Extension('KHR_materials_specular', specular_extension, False), uvmap_infos, udim_infos

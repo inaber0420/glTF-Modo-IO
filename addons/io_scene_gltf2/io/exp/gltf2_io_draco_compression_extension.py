@@ -16,7 +16,6 @@ from ctypes import *
 from pathlib import Path
 
 from ...io.exp.gltf2_io_binary_data import BinaryData
-from ...io.com.gltf2_io_debug import print_console
 from ...io.com.gltf2_io_draco_compression_extension import dll_path
 
 
@@ -45,7 +44,7 @@ def encode_scene_primitives(scenes, export_settings):
     dll.encoderSetIndices.argtypes = [c_void_p, c_size_t, c_uint32, c_void_p]
 
     dll.encoderSetAttribute.restype = c_uint32
-    dll.encoderSetAttribute.argtypes = [c_void_p, c_char_p, c_size_t, c_char_p, c_void_p]
+    dll.encoderSetAttribute.argtypes = [c_void_p, c_char_p, c_size_t, c_char_p, c_void_p, c_bool]
 
     dll.encoderEncode.restype = c_bool
     dll.encoderEncode.argtypes = [c_void_p, c_uint8]
@@ -100,7 +99,7 @@ def __traverse_node(node, f):
 
 def __encode_node(node, dll, export_settings, encoded_primitives_cache):
     if node.mesh is not None:
-        print_console('INFO', 'Draco encoder: Encoding mesh {}.'.format(node.name))
+        export_settings['log'].info('Draco encoder: Encoding mesh {}.'.format(node.name))
         for primitive in node.mesh.primitives:
             __encode_primitive(primitive, dll, export_settings, encoded_primitives_cache)
 
@@ -122,7 +121,7 @@ def __encode_primitive(primitive, dll, export_settings, encoded_primitives_cache
         return
 
     if 'POSITION' not in attributes:
-        print_console('WARNING', 'Draco encoder: Primitive without positions encountered. Skipping.')
+        export_settings['log'].warning('Draco encoder: Primitive without positions encountered. Skipping.')
         return
 
     positions = attributes['POSITION']
@@ -136,7 +135,7 @@ def __encode_primitive(primitive, dll, export_settings, encoded_primitives_cache
     draco_ids = {}
     for attr_name in attributes:
         attr = attributes[attr_name]
-        draco_id = dll.encoderSetAttribute(encoder, attr_name.encode(), attr.component_type, attr.type.encode(), attr.buffer_view.data)
+        draco_id = dll.encoderSetAttribute(encoder, attr_name.encode(), attr.component_type, attr.type.encode(), attr.buffer_view.data, attr.normalized)
         draco_ids[attr_name] = draco_id
 
     dll.encoderSetIndices(encoder, indices.component_type, indices.count, indices.buffer_view.data)
@@ -151,7 +150,7 @@ def __encode_primitive(primitive, dll, export_settings, encoded_primitives_cache
 
     preserve_triangle_order = primitive.targets is not None and len(primitive.targets) > 0
     if not dll.encoderEncode(encoder, preserve_triangle_order):
-        print_console('ERROR', 'Could not encode primitive. Skipping primitive.')
+        export_settings['log'].error('Could not encode primitive. Skipping primitive.')
 
     byte_length = dll.encoderGetByteLength(encoder)
     encoded_data = bytes(byte_length)
